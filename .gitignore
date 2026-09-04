@@ -1,0 +1,7 @@
+# Local exports and databases should never be committed
+*.csv
+*.db
+*.sqlite
+*.sqlite3
+.env
+__pycache__/

@@ -1,0 +1,1082 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ackerman Patient Payment Board - Prototype</title>
+  <style>
+    :root {
+      --navy: #12324a;
+      --navy-2: #1f4967;
+      --teal: #087f8c;
+      --background: #f4f7f9;
+      --surface: #ffffff;
+      --border: #d9e1e7;
+      --text: #18232d;
+      --muted: #5f6f7b;
+      --shadow: 0 8px 24px rgba(18, 50, 74, 0.08);
+      --ready: #e8f2ff;
+      --ready-accent: #2e6fae;
+      --due: #fff2d9;
+      --due-accent: #b66b00;
+      --overdue: #ffe4e6;
+      --overdue-accent: #b42318;
+      --partial: #fff8cc;
+      --partial-accent: #8a6d00;
+      --plan: #f0e7ff;
+      --plan-accent: #6941c6;
+      --paid: #def7e5;
+      --paid-accent: #18794e;
+      --none: #edf1f4;
+      --none-accent: #5d6b76;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--text);
+      background: var(--background);
+    }
+
+    button, input, select, textarea { font: inherit; }
+
+    .app-header {
+      background: linear-gradient(135deg, var(--navy), var(--navy-2));
+      color: #fff;
+      padding: 22px 28px;
+      box-shadow: var(--shadow);
+    }
+
+    .header-inner {
+      max-width: 1600px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+    }
+
+    .brand h1 {
+      margin: 0 0 5px;
+      font-size: clamp(1.25rem, 2vw, 1.85rem);
+      letter-spacing: 0.01em;
+    }
+
+    .brand p { margin: 0; color: #dce9f1; }
+
+    .demo-chip {
+      border: 1px solid rgba(255, 255, 255, 0.45);
+      border-radius: 999px;
+      padding: 8px 12px;
+      font-size: 0.82rem;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    main {
+      max-width: 1600px;
+      margin: 0 auto;
+      padding: 22px 28px 40px;
+    }
+
+    .notice {
+      background: #fff8e7;
+      border: 1px solid #f1d28b;
+      border-left: 5px solid #c78600;
+      border-radius: 10px;
+      padding: 12px 14px;
+      margin-bottom: 18px;
+      color: #5d4300;
+      font-size: 0.92rem;
+    }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(180px, 1fr));
+      gap: 14px;
+      margin-bottom: 18px;
+    }
+
+    .summary-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      box-shadow: var(--shadow);
+    }
+
+    .summary-label {
+      color: var(--muted);
+      font-size: 0.82rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .summary-value {
+      margin-top: 5px;
+      font-size: 1.65rem;
+      font-weight: 800;
+      color: var(--navy);
+    }
+
+    .workspace {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .toolbar {
+      padding: 16px;
+      border-bottom: 1px solid var(--border);
+      display: grid;
+      grid-template-columns: minmax(260px, 2fr) repeat(3, minmax(150px, 1fr)) auto;
+      gap: 10px;
+      align-items: end;
+    }
+
+    .field { display: flex; flex-direction: column; gap: 5px; }
+
+    .field label {
+      color: var(--muted);
+      font-size: 0.78rem;
+      font-weight: 700;
+    }
+
+    input, select, textarea {
+      width: 100%;
+      border: 1px solid #bfcbd4;
+      border-radius: 8px;
+      padding: 9px 10px;
+      background: #fff;
+      color: var(--text);
+    }
+
+    input:focus, select:focus, textarea:focus {
+      outline: 3px solid rgba(8, 127, 140, 0.16);
+      border-color: var(--teal);
+    }
+
+    .toolbar-actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      border: 0;
+      border-radius: 8px;
+      padding: 9px 12px;
+      font-weight: 750;
+      cursor: pointer;
+      transition: transform 0.08s ease, opacity 0.15s ease;
+    }
+
+    .btn:hover { opacity: 0.9; }
+    .btn:active { transform: translateY(1px); }
+    .btn-primary { background: var(--teal); color: #fff; }
+    .btn-secondary { background: #e9eff3; color: var(--navy); }
+    .btn-danger { background: #fee4e2; color: #b42318; }
+    .btn-success { background: #d9f3e2; color: #18794e; }
+    .btn-small { padding: 7px 9px; font-size: 0.79rem; }
+
+    .view-tabs {
+      display: flex;
+      gap: 6px;
+      padding: 12px 16px 0;
+    }
+
+    .tab {
+      border: 1px solid var(--border);
+      border-bottom: 0;
+      border-radius: 8px 8px 0 0;
+      padding: 9px 13px;
+      background: #eef3f6;
+      color: var(--muted);
+      cursor: pointer;
+      font-weight: 750;
+    }
+
+    .tab.active { background: #fff; color: var(--navy); }
+
+    .table-wrap { overflow-x: auto; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 1420px;
+    }
+
+    th, td {
+      text-align: left;
+      padding: 11px 10px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: middle;
+      white-space: nowrap;
+    }
+
+    th {
+      background: #f7fafb;
+      color: #40515f;
+      font-size: 0.76rem;
+      text-transform: uppercase;
+      letter-spacing: 0.035em;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+
+    tbody tr { border-left: 5px solid transparent; }
+    tbody tr:hover { filter: brightness(0.985); }
+
+    tr.status-ready { background: var(--ready); border-left-color: var(--ready-accent); }
+    tr.status-due { background: var(--due); border-left-color: var(--due-accent); }
+    tr.status-overdue { background: var(--overdue); border-left-color: var(--overdue-accent); }
+    tr.status-partial { background: var(--partial); border-left-color: var(--partial-accent); }
+    tr.status-plan { background: var(--plan); border-left-color: var(--plan-accent); }
+    tr.status-paid { background: var(--paid); border-left-color: var(--paid-accent); }
+    tr.status-none { background: var(--none); border-left-color: var(--none-accent); }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      padding: 5px 9px;
+      font-size: 0.72rem;
+      font-weight: 800;
+      border: 1px solid currentColor;
+      background: rgba(255, 255, 255, 0.62);
+    }
+
+    .status-pill.ready { color: var(--ready-accent); }
+    .status-pill.due { color: var(--due-accent); }
+    .status-pill.overdue { color: var(--overdue-accent); }
+    .status-pill.partial { color: var(--partial-accent); }
+    .status-pill.plan { color: var(--plan-accent); }
+    .status-pill.paid { color: var(--paid-accent); }
+    .status-pill.none { color: var(--none-accent); }
+
+    .patient-name { font-weight: 800; color: var(--navy); }
+    .mrn { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .money { font-variant-numeric: tabular-nums; text-align: right; }
+    .actions { display: flex; gap: 6px; }
+
+    .empty-state {
+      padding: 44px;
+      text-align: center;
+      color: var(--muted);
+    }
+
+    dialog {
+      width: min(720px, calc(100vw - 32px));
+      max-height: 90vh;
+      border: 0;
+      border-radius: 14px;
+      padding: 0;
+      box-shadow: 0 26px 70px rgba(0, 0, 0, 0.28);
+    }
+
+    dialog::backdrop { background: rgba(10, 27, 39, 0.58); }
+
+    .modal-header {
+      background: var(--navy);
+      color: #fff;
+      padding: 16px 18px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .modal-header h2 { margin: 0; font-size: 1.15rem; }
+
+    .icon-button {
+      border: 0;
+      background: transparent;
+      color: inherit;
+      font-size: 1.35rem;
+      cursor: pointer;
+    }
+
+    .modal-body {
+      padding: 18px;
+      overflow-y: auto;
+      max-height: calc(90vh - 130px);
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .form-grid .full { grid-column: 1 / -1; }
+
+    .modal-footer {
+      padding: 14px 18px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      background: #f7fafb;
+    }
+
+    .payment-summary {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .mini-card {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px;
+      background: #f7fafb;
+    }
+
+    .mini-card span { display: block; color: var(--muted); font-size: 0.75rem; }
+    .mini-card strong { display: block; margin-top: 3px; color: var(--navy); }
+
+    .footer-note {
+      margin-top: 14px;
+      color: var(--muted);
+      font-size: 0.79rem;
+      text-align: right;
+    }
+
+    @media (max-width: 1100px) {
+      .summary-grid { grid-template-columns: repeat(2, 1fr); }
+      .toolbar { grid-template-columns: repeat(2, 1fr); }
+      .toolbar-actions { grid-column: 1 / -1; }
+    }
+
+    @media (max-width: 700px) {
+      .app-header, main { padding-left: 14px; padding-right: 14px; }
+      .header-inner { align-items: flex-start; flex-direction: column; }
+      .summary-grid, .toolbar, .form-grid, .payment-summary { grid-template-columns: 1fr; }
+      .form-grid .full { grid-column: auto; }
+    }
+  </style>
+</head>
+<body>
+  <header class="app-header">
+    <div class="header-inner">
+      <div class="brand">
+        <h1>Ackerman Patient Payment Board</h1>
+        <p>Finance-to-front-office collection workflow</p>
+      </div>
+      <div class="demo-chip">FICTIONAL DATA PROTOTYPE</div>
+    </div>
+  </header>
+
+  <main>
+    <div class="notice">
+      <strong>Prototype only:</strong> every patient name and MRN below is fictional. This browser-only version stores changes on this computer and is not a shared clinical system.
+    </div>
+
+    <section class="summary-grid" aria-label="Payment summary">
+      <article class="summary-card">
+        <div class="summary-label">Active patients</div>
+        <div class="summary-value" id="activeCount">0</div>
+      </article>
+      <article class="summary-card">
+        <div class="summary-label">Amount outstanding</div>
+        <div class="summary-value" id="outstandingAmount">$0</div>
+      </article>
+      <article class="summary-card">
+        <div class="summary-label">Collected today</div>
+        <div class="summary-value" id="collectedToday">$0</div>
+      </article>
+      <article class="summary-card">
+        <div class="summary-label">Overdue accounts</div>
+        <div class="summary-value" id="overdueCount">0</div>
+      </article>
+    </section>
+
+    <section class="workspace">
+      <div class="toolbar">
+        <div class="field">
+          <label for="searchInput">Search patient name or MRN</label>
+          <input id="searchInput" type="search" placeholder="Example: Ava Mercer or DEMO-1001">
+        </div>
+        <div class="field">
+          <label for="statusFilter">Status</label>
+          <select id="statusFilter">
+            <option value="all">All statuses</option>
+            <option value="Ready for Collection">Ready for Collection</option>
+            <option value="Due Today">Due Today</option>
+            <option value="Overdue">Overdue</option>
+            <option value="Partially Paid">Partially Paid</option>
+            <option value="Payment Plan">Payment Plan</option>
+            <option value="Paid in Full">Paid in Full</option>
+            <option value="No Responsibility">No Responsibility</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="locationFilter">Location</label>
+          <select id="locationFilter">
+            <option value="all">All locations</option>
+            <option>Jacksonville</option>
+            <option>Amelia Island</option>
+            <option>Orange Park</option>
+            <option>St. Augustine</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="sortSelect">Sort by</label>
+          <select id="sortSelect">
+            <option value="date-asc">Collection date: earliest</option>
+            <option value="date-desc">Collection date: latest</option>
+            <option value="name-asc">Patient name: A-Z</option>
+            <option value="mrn-asc">MRN: A-Z</option>
+            <option value="owed-desc">Amount owed: highest</option>
+            <option value="owed-asc">Amount owed: lowest</option>
+          </select>
+        </div>
+        <div class="toolbar-actions">
+          <button class="btn btn-primary" id="addPatientButton" type="button">+ Add Patient</button>
+          <button class="btn btn-secondary" id="exportButton" type="button">Export CSV</button>
+          <button class="btn btn-secondary" id="resetButton" type="button">Reset Demo</button>
+        </div>
+      </div>
+
+      <div class="view-tabs" role="tablist" aria-label="Patient list view">
+        <button class="tab active" id="activeTab" type="button" role="tab" aria-selected="true">Active List</button>
+        <button class="tab" id="completedTab" type="button" role="tab" aria-selected="false">Completed</button>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Status</th>
+              <th>Patient Name</th>
+              <th>MRN</th>
+              <th>Physician</th>
+              <th>Location</th>
+              <th>Treatment</th>
+              <th>Insurance</th>
+              <th class="money">Responsibility</th>
+              <th class="money">Collected</th>
+              <th class="money">Amount Owed</th>
+              <th>Collection Date</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="patientTableBody"></tbody>
+        </table>
+        <div class="empty-state" id="emptyState" hidden>No patients match the current filters.</div>
+      </div>
+    </section>
+
+    <div class="footer-note">Prototype data is saved in this browser using localStorage.</div>
+  </main>
+
+  <dialog id="patientDialog">
+    <form id="patientForm" method="dialog">
+      <div class="modal-header">
+        <h2 id="patientDialogTitle">Add Patient</h2>
+        <button class="icon-button" type="button" data-close="patientDialog" aria-label="Close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="patientId">
+        <div class="form-grid">
+          <div class="field">
+            <label for="patientName">Patient name</label>
+            <input id="patientName" required maxlength="100" placeholder="Fictional name only">
+          </div>
+          <div class="field">
+            <label for="patientMrn">MRN</label>
+            <input id="patientMrn" required maxlength="30" placeholder="DEMO-1007">
+          </div>
+          <div class="field">
+            <label for="patientPhysician">Physician</label>
+            <input id="patientPhysician" required maxlength="100" placeholder="Dr. Jordan Lee">
+          </div>
+          <div class="field">
+            <label for="patientLocation">Location</label>
+            <select id="patientLocation" required>
+              <option>Jacksonville</option>
+              <option>Amelia Island</option>
+              <option>Orange Park</option>
+              <option>St. Augustine</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="patientTreatment">Treatment type</label>
+            <select id="patientTreatment" required>
+              <option>Proton Therapy</option>
+              <option>Radiation Therapy</option>
+              <option>Imaging</option>
+              <option>Consultation</option>
+              <option>Other</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="patientInsurance">Insurance</label>
+            <input id="patientInsurance" required maxlength="100" placeholder="Example Insurance">
+          </div>
+          <div class="field">
+            <label for="patientResponsibility">Patient responsibility</label>
+            <input id="patientResponsibility" type="number" min="0" step="0.01" required>
+          </div>
+          <div class="field">
+            <label for="patientCollected">Already collected</label>
+            <input id="patientCollected" type="number" min="0" step="0.01" value="0" required>
+          </div>
+          <div class="field">
+            <label for="patientDate">Collection date</label>
+            <input id="patientDate" type="date" required>
+          </div>
+          <div class="field">
+            <label for="patientStatus">Status</label>
+            <select id="patientStatus" required>
+              <option>Ready for Collection</option>
+              <option>Partially Paid</option>
+              <option>Payment Plan</option>
+              <option>Paid in Full</option>
+              <option>No Responsibility</option>
+            </select>
+          </div>
+          <div class="field full">
+            <label for="patientNotes">Finance note</label>
+            <textarea id="patientNotes" rows="3" maxlength="500" placeholder="Optional collection instructions"></textarea>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" type="button" data-close="patientDialog">Cancel</button>
+        <button class="btn btn-primary" type="submit">Save Patient</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="paymentDialog">
+    <form id="paymentForm" method="dialog">
+      <div class="modal-header">
+        <h2>Record Payment</h2>
+        <button class="icon-button" type="button" data-close="paymentDialog" aria-label="Close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="paymentPatientId">
+        <div class="payment-summary">
+          <div class="mini-card"><span>Patient</span><strong id="paymentPatientName">-</strong></div>
+          <div class="mini-card"><span>MRN</span><strong id="paymentPatientMrn">-</strong></div>
+          <div class="mini-card"><span>Current balance</span><strong id="paymentBalance">$0</strong></div>
+        </div>
+        <div class="form-grid">
+          <div class="field">
+            <label for="paymentAmount">Amount collected</label>
+            <input id="paymentAmount" type="number" min="0.01" step="0.01" required>
+          </div>
+          <div class="field">
+            <label for="paymentDate">Collection date</label>
+            <input id="paymentDate" type="date" required>
+          </div>
+          <div class="field">
+            <label for="paymentLocation">Site location</label>
+            <select id="paymentLocation" required>
+              <option>Jacksonville</option>
+              <option>Amelia Island</option>
+              <option>Orange Park</option>
+              <option>St. Augustine</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="paymentMethod">Payment method</label>
+            <select id="paymentMethod" required>
+              <option>Credit/Debit Card</option>
+              <option>Check</option>
+              <option>Cash</option>
+              <option>Online Portal</option>
+              <option>Other</option>
+            </select>
+          </div>
+          <div class="field full">
+            <label for="paymentNote">Note</label>
+            <textarea id="paymentNote" rows="3" maxlength="500" placeholder="Optional note"></textarea>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" type="button" data-close="paymentDialog">Cancel</button>
+        <button class="btn btn-primary" type="submit">Save Payment</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script>
+    "use strict";
+
+    const STORAGE_KEY = "ackermanPaymentPrototypeV1";
+    const currency = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
+    const todayIso = () => new Date().toISOString().slice(0, 10);
+
+    const seedPatients = [
+      {
+        id: "demo-1001",
+        name: "Ava Mercer",
+        mrn: "DEMO-1001",
+        physician: "Dr. Jordan Lee",
+        location: "Jacksonville",
+        treatment: "Proton Therapy",
+        insurance: "Fictional Health Plan",
+        responsibility: 850,
+        collected: 250,
+        collectionDate: "2026-09-02",
+        status: "Partially Paid",
+        notes: "Fictional sample record.",
+        archived: false,
+        payments: [{ amount: 250, date: "2026-09-04", location: "Jacksonville", method: "Credit/Debit Card" }]
+      },
+      {
+        id: "demo-1002",
+        name: "Liam Brooks",
+        mrn: "DEMO-1002",
+        physician: "Dr. Morgan Ellis",
+        location: "Orange Park",
+        treatment: "Radiation Therapy",
+        insurance: "Example Choice Insurance",
+        responsibility: 420,
+        collected: 0,
+        collectionDate: "2026-09-04",
+        status: "Ready for Collection",
+        notes: "Collect at next visit.",
+        archived: false,
+        payments: []
+      },
+      {
+        id: "demo-1003",
+        name: "Sofia Patel",
+        mrn: "DEMO-1003",
+        physician: "Dr. Taylor Reed",
+        location: "St. Augustine",
+        treatment: "Imaging",
+        insurance: "SampleCare PPO",
+        responsibility: 300,
+        collected: 100,
+        collectionDate: "2026-09-12",
+        status: "Payment Plan",
+        notes: "Two remaining fictional installments.",
+        archived: false,
+        payments: [{ amount: 100, date: "2026-08-29", location: "St. Augustine", method: "Check" }]
+      },
+      {
+        id: "demo-1004",
+        name: "Noah Bennett",
+        mrn: "DEMO-1004",
+        physician: "Dr. Casey Monroe",
+        location: "Amelia Island",
+        treatment: "Consultation",
+        insurance: "Demo Mutual",
+        responsibility: 175,
+        collected: 175,
+        collectionDate: "2026-09-01",
+        status: "Paid in Full",
+        notes: "Ready to complete.",
+        archived: false,
+        payments: [{ amount: 175, date: "2026-09-04", location: "Amelia Island", method: "Online Portal" }]
+      },
+      {
+        id: "demo-1005",
+        name: "Mia Thompson",
+        mrn: "DEMO-1005",
+        physician: "Dr. Jordan Lee",
+        location: "Jacksonville",
+        treatment: "Proton Therapy",
+        insurance: "Fictional Health Plan",
+        responsibility: 0,
+        collected: 0,
+        collectionDate: "2026-09-10",
+        status: "No Responsibility",
+        notes: "Fictional no-responsibility example.",
+        archived: false,
+        payments: []
+      },
+      {
+        id: "demo-1006",
+        name: "Ethan Rivera",
+        mrn: "DEMO-1006",
+        physician: "Dr. Morgan Ellis",
+        location: "Orange Park",
+        treatment: "Radiation Therapy",
+        insurance: "Example Choice Insurance",
+        responsibility: 1200,
+        collected: 0,
+        collectionDate: "2026-08-25",
+        status: "Ready for Collection",
+        notes: "Past fictional collection date.",
+        archived: false,
+        payments: []
+      }
+    ];
+
+    let patients = loadPatients();
+    let currentView = "active";
+
+    const elements = {
+      tbody: document.getElementById("patientTableBody"),
+      emptyState: document.getElementById("emptyState"),
+      search: document.getElementById("searchInput"),
+      statusFilter: document.getElementById("statusFilter"),
+      locationFilter: document.getElementById("locationFilter"),
+      sort: document.getElementById("sortSelect"),
+      activeTab: document.getElementById("activeTab"),
+      completedTab: document.getElementById("completedTab"),
+      patientDialog: document.getElementById("patientDialog"),
+      paymentDialog: document.getElementById("paymentDialog")
+    };
+
+    function deepCopy(value) {
+      return JSON.parse(JSON.stringify(value));
+    }
+
+    function loadPatients() {
+      try {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        return stored ? JSON.parse(stored) : deepCopy(seedPatients);
+      } catch (error) {
+        console.warn("Could not load stored prototype data.", error);
+        return deepCopy(seedPatients);
+      }
+    }
+
+    function savePatients() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(patients));
+      } catch (error) {
+        console.warn("Prototype changes will remain in memory for this browser tab only.", error);
+      }
+    }
+
+    function uid() {
+      return (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : `patient-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    }
+
+    function amountOwed(patient) {
+      return Math.max(0, Number(patient.responsibility || 0) - Number(patient.collected || 0));
+    }
+
+    function effectiveStatus(patient) {
+      const owed = amountOwed(patient);
+      if (patient.status === "No Responsibility") return "No Responsibility";
+      if (owed <= 0) return "Paid in Full";
+      if (patient.status === "Payment Plan") return "Payment Plan";
+      if (Number(patient.collected) > 0) return "Partially Paid";
+
+      const today = todayIso();
+      if (patient.collectionDate < today) return "Overdue";
+      if (patient.collectionDate === today) return "Due Today";
+      return "Ready for Collection";
+    }
+
+    function statusMeta(status) {
+      const map = {
+        "Ready for Collection": { row: "status-ready", pill: "ready" },
+        "Due Today": { row: "status-due", pill: "due" },
+        "Overdue": { row: "status-overdue", pill: "overdue" },
+        "Partially Paid": { row: "status-partial", pill: "partial" },
+        "Payment Plan": { row: "status-plan", pill: "plan" },
+        "Paid in Full": { row: "status-paid", pill: "paid" },
+        "No Responsibility": { row: "status-none", pill: "none" }
+      };
+      return map[status] || map["Ready for Collection"];
+    }
+
+    function formatDate(isoDate) {
+      if (!isoDate) return "-";
+      const [year, month, day] = isoDate.split("-").map(Number);
+      return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" })
+        .format(new Date(year, month - 1, day));
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    function filteredPatients() {
+      const query = elements.search.value.trim().toLowerCase();
+      const status = elements.statusFilter.value;
+      const location = elements.locationFilter.value;
+
+      const result = patients.filter((patient) => {
+        const isInView = currentView === "active" ? !patient.archived : patient.archived;
+        const matchesQuery = !query || patient.name.toLowerCase().includes(query) || patient.mrn.toLowerCase().includes(query);
+        const actualStatus = effectiveStatus(patient);
+        const matchesStatus = status === "all" || actualStatus === status;
+        const matchesLocation = location === "all" || patient.location === location;
+        return isInView && matchesQuery && matchesStatus && matchesLocation;
+      });
+
+      const sortMode = elements.sort.value;
+      result.sort((a, b) => {
+        if (sortMode === "date-asc") return a.collectionDate.localeCompare(b.collectionDate);
+        if (sortMode === "date-desc") return b.collectionDate.localeCompare(a.collectionDate);
+        if (sortMode === "name-asc") return a.name.localeCompare(b.name);
+        if (sortMode === "mrn-asc") return a.mrn.localeCompare(b.mrn);
+        if (sortMode === "owed-desc") return amountOwed(b) - amountOwed(a);
+        if (sortMode === "owed-asc") return amountOwed(a) - amountOwed(b);
+        return 0;
+      });
+
+      return result;
+    }
+
+    function render() {
+      const rows = filteredPatients();
+      elements.tbody.innerHTML = "";
+      elements.emptyState.hidden = rows.length > 0;
+
+      for (const patient of rows) {
+        const status = effectiveStatus(patient);
+        const meta = statusMeta(status);
+        const owed = amountOwed(patient);
+        const tr = document.createElement("tr");
+        tr.className = meta.row;
+
+        const completeButton = !patient.archived && (owed <= 0 || status === "No Responsibility")
+          ? `<button class="btn btn-success btn-small" data-action="complete" data-id="${escapeHtml(patient.id)}">Complete</button>`
+          : "";
+
+        const restoreButton = patient.archived
+          ? `<button class="btn btn-secondary btn-small" data-action="restore" data-id="${escapeHtml(patient.id)}">Restore</button>`
+          : "";
+
+        const paymentButton = !patient.archived && owed > 0
+          ? `<button class="btn btn-primary btn-small" data-action="payment" data-id="${escapeHtml(patient.id)}">Record Payment</button>`
+          : "";
+
+        const editButton = !patient.archived
+          ? `<button class="btn btn-secondary btn-small" data-action="edit" data-id="${escapeHtml(patient.id)}">Edit</button>`
+          : "";
+
+        tr.innerHTML = `
+          <td><span class="status-pill ${meta.pill}">${escapeHtml(status)}</span></td>
+          <td class="patient-name">${escapeHtml(patient.name)}</td>
+          <td class="mrn">${escapeHtml(patient.mrn)}</td>
+          <td>${escapeHtml(patient.physician)}</td>
+          <td>${escapeHtml(patient.location)}</td>
+          <td>${escapeHtml(patient.treatment)}</td>
+          <td>${escapeHtml(patient.insurance)}</td>
+          <td class="money">${currency.format(Number(patient.responsibility || 0))}</td>
+          <td class="money">${currency.format(Number(patient.collected || 0))}</td>
+          <td class="money"><strong>${currency.format(owed)}</strong></td>
+          <td>${formatDate(patient.collectionDate)}</td>
+          <td><div class="actions">${paymentButton}${editButton}${completeButton}${restoreButton}</div></td>
+        `;
+        elements.tbody.appendChild(tr);
+      }
+
+      renderSummary();
+    }
+
+    function renderSummary() {
+      const active = patients.filter((patient) => !patient.archived);
+      const outstanding = active.reduce((sum, patient) => sum + amountOwed(patient), 0);
+      const overdue = active.filter((patient) => effectiveStatus(patient) === "Overdue").length;
+      const today = todayIso();
+      const receivedToday = patients.reduce((sum, patient) => {
+        return sum + (patient.payments || [])
+          .filter((payment) => payment.date === today)
+          .reduce((paymentSum, payment) => paymentSum + Number(payment.amount || 0), 0);
+      }, 0);
+
+      document.getElementById("activeCount").textContent = active.length;
+      document.getElementById("outstandingAmount").textContent = currency.format(outstanding);
+      document.getElementById("collectedToday").textContent = currency.format(receivedToday);
+      document.getElementById("overdueCount").textContent = overdue;
+    }
+
+    function openPatientDialog(patient = null) {
+      document.getElementById("patientDialogTitle").textContent = patient ? "Edit Patient" : "Add Patient";
+      document.getElementById("patientId").value = patient?.id || "";
+      document.getElementById("patientName").value = patient?.name || "";
+      document.getElementById("patientMrn").value = patient?.mrn || "";
+      document.getElementById("patientPhysician").value = patient?.physician || "";
+      document.getElementById("patientLocation").value = patient?.location || "Jacksonville";
+      document.getElementById("patientTreatment").value = patient?.treatment || "Proton Therapy";
+      document.getElementById("patientInsurance").value = patient?.insurance || "";
+      document.getElementById("patientResponsibility").value = patient?.responsibility ?? "";
+      document.getElementById("patientCollected").value = patient?.collected ?? 0;
+      document.getElementById("patientDate").value = patient?.collectionDate || todayIso();
+      document.getElementById("patientStatus").value = patient?.status || "Ready for Collection";
+      document.getElementById("patientNotes").value = patient?.notes || "";
+      elements.patientDialog.showModal();
+      document.getElementById("patientName").focus();
+    }
+
+    function openPaymentDialog(patient) {
+      document.getElementById("paymentPatientId").value = patient.id;
+      document.getElementById("paymentPatientName").textContent = patient.name;
+      document.getElementById("paymentPatientMrn").textContent = patient.mrn;
+      document.getElementById("paymentBalance").textContent = currency.format(amountOwed(patient));
+      document.getElementById("paymentAmount").value = "";
+      document.getElementById("paymentAmount").max = String(amountOwed(patient));
+      document.getElementById("paymentDate").value = todayIso();
+      document.getElementById("paymentLocation").value = patient.location;
+      document.getElementById("paymentMethod").value = "Credit/Debit Card";
+      document.getElementById("paymentNote").value = "";
+      elements.paymentDialog.showModal();
+      document.getElementById("paymentAmount").focus();
+    }
+
+    document.getElementById("patientForm").addEventListener("submit", (event) => {
+      event.preventDefault();
+
+      const id = document.getElementById("patientId").value;
+      const responsibility = Number(document.getElementById("patientResponsibility").value);
+      const collected = Number(document.getElementById("patientCollected").value);
+
+      if (collected > responsibility && responsibility >= 0) {
+        alert("Already collected cannot exceed patient responsibility in this prototype.");
+        return;
+      }
+
+      const record = {
+        id: id || uid(),
+        name: document.getElementById("patientName").value.trim(),
+        mrn: document.getElementById("patientMrn").value.trim().toUpperCase(),
+        physician: document.getElementById("patientPhysician").value.trim(),
+        location: document.getElementById("patientLocation").value,
+        treatment: document.getElementById("patientTreatment").value,
+        insurance: document.getElementById("patientInsurance").value.trim(),
+        responsibility,
+        collected,
+        collectionDate: document.getElementById("patientDate").value,
+        status: document.getElementById("patientStatus").value,
+        notes: document.getElementById("patientNotes").value.trim(),
+        archived: false,
+        payments: []
+      };
+
+      const duplicateMrn = patients.some((patient) => patient.mrn.toLowerCase() === record.mrn.toLowerCase() && patient.id !== record.id);
+      if (duplicateMrn) {
+        alert("That MRN already exists in the prototype.");
+        return;
+      }
+
+      const existingIndex = patients.findIndex((patient) => patient.id === id);
+      if (existingIndex >= 0) {
+        record.archived = patients[existingIndex].archived;
+        record.payments = patients[existingIndex].payments || [];
+        patients[existingIndex] = record;
+      } else {
+        patients.push(record);
+      }
+
+      savePatients();
+      elements.patientDialog.close();
+      render();
+    });
+
+    document.getElementById("paymentForm").addEventListener("submit", (event) => {
+      event.preventDefault();
+      const id = document.getElementById("paymentPatientId").value;
+      const patient = patients.find((item) => item.id === id);
+      if (!patient) return;
+
+      const amount = Number(document.getElementById("paymentAmount").value);
+      const balance = amountOwed(patient);
+      if (amount <= 0 || amount > balance) {
+        alert(`Enter a payment between $0.01 and ${currency.format(balance)}.`);
+        return;
+      }
+
+      patient.collected = Number(patient.collected || 0) + amount;
+      patient.payments = patient.payments || [];
+      patient.payments.push({
+        amount,
+        date: document.getElementById("paymentDate").value,
+        location: document.getElementById("paymentLocation").value,
+        method: document.getElementById("paymentMethod").value,
+        note: document.getElementById("paymentNote").value.trim()
+      });
+
+      patient.status = amountOwed(patient) <= 0 ? "Paid in Full" : "Partially Paid";
+      savePatients();
+      elements.paymentDialog.close();
+      render();
+    });
+
+    elements.tbody.addEventListener("click", (event) => {
+      const button = event.target.closest("button[data-action]");
+      if (!button) return;
+      const patient = patients.find((item) => item.id === button.dataset.id);
+      if (!patient) return;
+
+      if (button.dataset.action === "payment") openPaymentDialog(patient);
+      if (button.dataset.action === "edit") openPatientDialog(patient);
+      if (button.dataset.action === "complete") {
+        patient.archived = true;
+        savePatients();
+        render();
+      }
+      if (button.dataset.action === "restore") {
+        patient.archived = false;
+        savePatients();
+        render();
+      }
+    });
+
+    document.getElementById("addPatientButton").addEventListener("click", () => openPatientDialog());
+
+    document.querySelectorAll("[data-close]").forEach((button) => {
+      button.addEventListener("click", () => document.getElementById(button.dataset.close).close());
+    });
+
+    [elements.search, elements.statusFilter, elements.locationFilter, elements.sort]
+      .forEach((control) => control.addEventListener("input", render));
+
+    elements.activeTab.addEventListener("click", () => setView("active"));
+    elements.completedTab.addEventListener("click", () => setView("completed"));
+
+    function setView(view) {
+      currentView = view;
+      const active = view === "active";
+      elements.activeTab.classList.toggle("active", active);
+      elements.completedTab.classList.toggle("active", !active);
+      elements.activeTab.setAttribute("aria-selected", String(active));
+      elements.completedTab.setAttribute("aria-selected", String(!active));
+      render();
+    }
+
+    document.getElementById("resetButton").addEventListener("click", () => {
+      if (!confirm("Reset all prototype changes and restore the fictional sample records?")) return;
+      patients = deepCopy(seedPatients);
+      savePatients();
+      setView("active");
+    });
+
+    document.getElementById("exportButton").addEventListener("click", () => {
+      const headers = ["Status", "Patient Name", "MRN", "Physician", "Location", "Treatment", "Insurance", "Responsibility", "Collected", "Amount Owed", "Collection Date", "Archived"];
+      const rows = patients.map((patient) => [
+        effectiveStatus(patient), patient.name, patient.mrn, patient.physician, patient.location,
+        patient.treatment, patient.insurance, patient.responsibility, patient.collected,
+        amountOwed(patient), patient.collectionDate, patient.archived ? "Yes" : "No"
+      ]);
+      const csv = [headers, ...rows]
+        .map((row) => row.map((cell) => `"${String(cell ?? "").replaceAll('"', '""')}"`).join(","))
+        .join("\r\n");
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `ackerman-payment-prototype-${todayIso()}.csv`;
+      link.click();
+      URL.revokeObjectURL(url);
+    });
+
+    render();
+  </script>
+</body>
+</html>
