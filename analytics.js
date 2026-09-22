@@ -88,10 +88,10 @@
   }
 
   function populateFilters() {
-    const unique = (key) => [...new Set(patients.map((patient) => patient[key]).filter(Boolean))]
-      .sort((a, b) => a.localeCompare(b));
-    setSelectOptions(elements.location, unique("location"), "All locations");
-    setSelectOptions(elements.treatment, unique("treatment"), "All treatments");
+    const locations = [...new Set(patients.map((patient) => patient.location).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+    const treatments = [...new Set(patients.flatMap((patient) => D.patientTreatments(patient)))].sort((a, b) => a.localeCompare(b));
+    setSelectOptions(elements.location, locations, "All locations");
+    setSelectOptions(elements.treatment, treatments, "All treatments");
   }
 
   function matchesAnalyticsStatus(patient) {
@@ -120,7 +120,7 @@
       const matchesFrom = !from || date >= from;
       const matchesTo = !to || date <= to;
       const matchesLocation = elements.location.value === "all" || patient.location === elements.location.value;
-      const matchesTreatment = elements.treatment.value === "all" || patient.treatment === elements.treatment.value;
+      const matchesTreatment = elements.treatment.value === "all" || D.patientTreatments(patient).includes(elements.treatment.value);
       return matchesFrom && matchesTo && matchesLocation && matchesTreatment && matchesAnalyticsStatus(patient);
     });
   }
@@ -270,20 +270,10 @@
   function summarizeBy(selected, key) {
     const grouped = new Map();
 
-    selected.forEach((patient) => {
-      const groupName = key === "status" ? D.effectiveStatus(patient) : (patient[key] || "Not entered");
+    const addPatient = (patient, groupName) => {
       if (!grouped.has(groupName)) {
-        grouped.set(groupName, {
-          name: groupName,
-          patients: 0,
-          paying: 0,
-          responsibility: 0,
-          collected: 0,
-          outstanding: 0,
-          rate: 0
-        });
+        grouped.set(groupName, { name: groupName, patients: 0, paying: 0, responsibility: 0, collected: 0, outstanding: 0, rate: 0 });
       }
-
       const row = grouped.get(groupName);
       const eligible = D.effectiveStatus(patient) !== "No Responsibility" && Number(patient.responsibility || 0) > 0;
       row.patients += 1;
@@ -293,12 +283,18 @@
         row.outstanding += D.amountOwed(patient);
         if (D.netCollected(patient) > 0) row.paying += 1;
       }
+    };
+
+    selected.forEach((patient) => {
+      const groupNames = key === "treatment"
+        ? D.patientTreatments(patient)
+        : [key === "status" ? D.effectiveStatus(patient) : (patient[key] || "Not entered")];
+      groupNames.forEach((groupName) => addPatient(patient, groupName));
     });
 
     grouped.forEach((row) => {
       row.rate = row.responsibility > 0 ? (row.collected / row.responsibility) * 100 : 0;
     });
-
     return [...grouped.values()];
   }
 
@@ -474,9 +470,9 @@
     rows.forEach(({ patient, summary }) => {
       const onTime = summary.onTimeRate === null ? "Not due yet" : `${summary.onTimeRate.toFixed(1)}%`;
       const nextDue = summary.nextDue
-        ? `${D.formatDate(summary.nextDue.dueDate)} · ${summary.nextDue.responsibilityParty} · ${D.currency.format(summary.nextDue.remaining)}`
+        ? `${D.formatDate(summary.nextDue.dueDate)} · ${summary.nextDue.responsibilityParty === "UF" ? "UF" : "ACC"} · ${D.currency.format(summary.nextDue.amountDue)}`
         : "Plan complete";
-      const terms = [`${summary.ackermanCount} Ackerman / ${summary.ufCount} UF`, summary.promiseToPayDate ? `Promise ${D.formatDate(summary.promiseToPayDate)}` : "", summary.ufCheckDueCount ? `${summary.ufCheckDueCount} UF check due` : "", summary.repeatedMisses ? "Red status" : ""].filter(Boolean).join(" · ");
+      const terms = [`${summary.ackermanCount} ACC / ${summary.ufCount} UF`, summary.ufCheckDueCount ? `${summary.ufCheckDueCount} UF check due` : "", summary.repeatedMisses ? "Red status" : ""].filter(Boolean).join(" · ");
       const tr = document.createElement("tr");
       tr.innerHTML = `
         <td data-label="Patient"><strong>${D.escapeHtml(patient.name)}</strong><div class="mrn">${D.escapeHtml(patient.mrn)}</div></td>

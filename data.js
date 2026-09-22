@@ -6,6 +6,21 @@
   const SAVED_VIEWS_KEY = "ackermanPaymentSavedViewsV5";
   const LEGACY_SAVED_VIEWS_KEYS = ["ackermanPaymentSavedViewsV4"];
   const EPSILON = 0.005;
+  const TREATMENT_FLAGS = [
+    "Proton",
+    "Radiation (Linac/HDR/Other)",
+    "Imaging",
+    "Clinic",
+    "Women's Imaging"
+  ];
+  const OFFICE_SITES = [
+    "ACC Mandarin",
+    "ACC Amelia Island",
+    "ACC St. Augustine",
+    "Urology World Golf Village",
+    "Urology Middleburg",
+    "Other"
+  ];
 
   const currency = new Intl.NumberFormat("en-US", {
     style: "currency",
@@ -155,6 +170,65 @@
     ufCheckPlanTwo.installments[3].dueDate = dateOffset(30);
     ufCheckPlanTwo.installments[3].originalDueDate = ufCheckPlanTwo.installments[3].dueDate;
     ufCheckPlanTwo.installments[3].responsibilityParty = "UF";
+
+    // Version 2.1.3 presentation coverage: add fresh, purpose-built demo
+    // scenarios so each important workflow has at least two examples available.
+    const demoUfOnlyOne = planRecord(600, 2, dateOffset(-6), "monthly", 0, dateOffset(-8));
+    demoUfOnlyOne.installments[0].dueDate = dateOffset(-6);
+    demoUfOnlyOne.installments[0].originalDueDate = demoUfOnlyOne.installments[0].dueDate;
+    demoUfOnlyOne.installments[0].responsibilityParty = "UF";
+    demoUfOnlyOne.installments[1].dueDate = dateOffset(21);
+    demoUfOnlyOne.installments[1].originalDueDate = demoUfOnlyOne.installments[1].dueDate;
+    demoUfOnlyOne.installments[1].responsibilityParty = "UF";
+
+    const demoUfOnlyTwo = planRecord(800, 2, dateOffset(-2), "monthly", 0, dateOffset(-4));
+    demoUfOnlyTwo.installments[0].dueDate = dateOffset(-2);
+    demoUfOnlyTwo.installments[0].originalDueDate = demoUfOnlyTwo.installments[0].dueDate;
+    demoUfOnlyTwo.installments[0].responsibilityParty = "UF";
+    demoUfOnlyTwo.installments[1].dueDate = dateOffset(28);
+    demoUfOnlyTwo.installments[1].originalDueDate = demoUfOnlyTwo.installments[1].dueDate;
+    demoUfOnlyTwo.installments[1].responsibilityParty = "UF";
+
+    const demoRedOne = planRecord(900, 3, dateOffset(-35), "monthly", 0, dateOffset(-40));
+    demoRedOne.installments[0].dueDate = dateOffset(-35);
+    demoRedOne.installments[1].dueDate = dateOffset(-5);
+    demoRedOne.installments[2].dueDate = dateOffset(25);
+    demoRedOne.installments.forEach((item) => { item.originalDueDate = item.dueDate; item.responsibilityParty = "Ackerman"; });
+
+    const demoRedTwo = planRecord(1200, 4, dateOffset(-50), "monthly", 0, dateOffset(-55));
+    [dateOffset(-50), dateOffset(-20), dateOffset(-3), dateOffset(27)].forEach((dueDate, index) => {
+      demoRedTwo.installments[index].dueDate = dueDate;
+      demoRedTwo.installments[index].originalDueDate = dueDate;
+      demoRedTwo.installments[index].responsibilityParty = "Ackerman";
+    });
+
+    const demoDueTodayOne = planRecord(450, 1, dateOffset(0), "monthly", 0, dateOffset(-1));
+    demoDueTodayOne.installments[0].dueDate = dateOffset(0);
+    demoDueTodayOne.installments[0].originalDueDate = demoDueTodayOne.installments[0].dueDate;
+
+    const demoDueTodayTwo = planRecord(700, 2, dateOffset(0), "monthly", 0, dateOffset(-1));
+    demoDueTodayTwo.installments[0].dueDate = dateOffset(0);
+    demoDueTodayTwo.installments[0].originalDueDate = demoDueTodayTwo.installments[0].dueDate;
+    demoDueTodayTwo.installments[1].dueDate = dateOffset(30);
+    demoDueTodayTwo.installments[1].originalDueDate = demoDueTodayTwo.installments[1].dueDate;
+
+    const demoPaidFull = planRecord(500, 1, dateOffset(-7), "monthly", 0, dateOffset(-10));
+    demoPaidFull.installments[0].dueDate = dateOffset(-7);
+    demoPaidFull.installments[0].originalDueDate = demoPaidFull.installments[0].dueDate;
+
+    const demoClosedBalanceOne = planRecord(1500, 3, dateOffset(-90), "monthly", 0, dateOffset(-100));
+    [dateOffset(-90), dateOffset(-60), dateOffset(-30)].forEach((dueDate, index) => {
+      demoClosedBalanceOne.installments[index].dueDate = dueDate;
+      demoClosedBalanceOne.installments[index].originalDueDate = dueDate;
+    });
+    demoClosedBalanceOne.installments[1].responsibilityParty = "UF";
+
+    const demoClosedBalanceTwo = planRecord(900, 3, dateOffset(-75), "monthly", 0, dateOffset(-85));
+    [dateOffset(-75), dateOffset(-45), dateOffset(-15)].forEach((dueDate, index) => {
+      demoClosedBalanceTwo.installments[index].dueDate = dueDate;
+      demoClosedBalanceTwo.installments[index].originalDueDate = dueDate;
+    });
+    demoClosedBalanceTwo.installments[0].responsibilityParty = "UF";
 
     return [
       {
@@ -413,7 +487,7 @@
         collected: 400,
         collectionDate: benPlan.installments[0].dueDate,
         status: "Payment Plan",
-        notes: "Ten-payment fictional plan. Two Ackerman-responsible installments are overdue.",
+        notes: "Ten-payment fictional plan. Two ACC-assigned installments are overdue.",
         archived: false,
         completedAt: "",
         paymentPlan: benPlan,
@@ -470,7 +544,7 @@
         collectionDate: ufCheckPlanOne.installments[0].dueDate,
         status: "Payment Plan",
         statusNote: "Check UF payment",
-        notes: "Version 5.3 demo: one UF-responsible payment is past due and needs Finance verification.",
+        notes: "Version 2 demo: one UF-assigned payment is past due and needs Finance verification.",
         archived: false,
         completedAt: "",
         paymentPlan: ufCheckPlanOne,
@@ -488,11 +562,207 @@
         collectionDate: ufCheckPlanTwo.installments[0].dueDate,
         status: "Payment Plan",
         statusNote: "Verify UF payments",
-        notes: "Version 5.3 demo: two UF-responsible payments are past due and need Finance verification.",
+        notes: "Version 2 demo: two UF-assigned payments are past due and need Finance verification.",
         archived: false,
         completedAt: "",
         paymentPlan: ufCheckPlanTwo,
         payments: []
+      }
+,
+      {
+        id: "demo-1019",
+        name: "Maya Lopez",
+        mrn: "DEMO-1019",
+        location: "Jacksonville",
+        treatments: ["Women's Imaging", "Imaging"],
+        insurance: "Fictional Health Plan",
+        responsibility: 600,
+        collected: 0,
+        collectionDate: demoUfOnlyOne.installments[0].dueDate,
+        status: "Payment Plan",
+        statusNote: "Check UF payment",
+        notes: "Demo coverage: UF-only plan with one overdue UF payment and one future UF payment.",
+        archived: false,
+        completedAt: "",
+        paymentPlan: demoUfOnlyOne,
+        payments: []
+      },
+      {
+        id: "demo-1020",
+        name: "Caleb Wright",
+        mrn: "DEMO-1020",
+        location: "Urology Middleburg",
+        treatments: ["Clinic", "Imaging"],
+        insurance: "Example Choice Insurance",
+        responsibility: 800,
+        collected: 0,
+        collectionDate: demoUfOnlyTwo.installments[0].dueDate,
+        status: "Payment Plan",
+        statusNote: "Verify UF payment",
+        notes: "Demo coverage: second UF-only account with a Check UF item already past due.",
+        archived: false,
+        completedAt: "",
+        paymentPlan: demoUfOnlyTwo,
+        payments: []
+      },
+      {
+        id: "demo-1021",
+        name: "Natalie Reed",
+        mrn: "DEMO-1021",
+        location: "Jacksonville",
+        treatments: ["Proton", "Imaging"],
+        insurance: "SampleCare PPO",
+        responsibility: 900,
+        collected: 0,
+        collectionDate: demoRedOne.installments[0].dueDate,
+        status: "Payment Plan",
+        statusNote: "Call patient",
+        notes: "Demo coverage: red account with two ACC-assigned payments overdue.",
+        archived: false,
+        completedAt: "",
+        paymentPlan: demoRedOne,
+        payments: []
+      },
+      {
+        id: "demo-1022",
+        name: "Marcus Bell",
+        mrn: "DEMO-1022",
+        location: "St. Augustine",
+        treatments: ["Radiation (Linac/HDR/Other)", "Clinic"],
+        insurance: "Demo Mutual",
+        responsibility: 1200,
+        collected: 0,
+        collectionDate: demoRedTwo.installments[0].dueDate,
+        status: "Payment Plan",
+        statusNote: "Escalate collection",
+        notes: "Demo coverage: second red account with three ACC-assigned payments overdue.",
+        archived: false,
+        completedAt: "",
+        paymentPlan: demoRedTwo,
+        payments: []
+      },
+      {
+        id: "demo-1023",
+        name: "Emily Stone",
+        mrn: "DEMO-1023",
+        location: "Amelia Island",
+        treatments: ["Women's Imaging", "Clinic"],
+        insurance: "Fictional Health Plan",
+        responsibility: 450,
+        collected: 0,
+        collectionDate: demoDueTodayOne.installments[0].dueDate,
+        status: "Payment Plan",
+        statusNote: "Collect today",
+        notes: "Demo coverage: ACC payment due today.",
+        archived: false,
+        completedAt: "",
+        paymentPlan: demoDueTodayOne,
+        payments: []
+      },
+      {
+        id: "demo-1024",
+        name: "Dylan Moore",
+        mrn: "DEMO-1024",
+        location: "Urology World Golf Village",
+        treatments: ["Radiation (Linac/HDR/Other)", "Imaging"],
+        insurance: "Example Choice Insurance",
+        responsibility: 700,
+        collected: 0,
+        collectionDate: demoDueTodayTwo.installments[0].dueDate,
+        status: "Payment Plan",
+        statusNote: "First payment due today",
+        notes: "Demo coverage: second due-today plan with another installment scheduled later.",
+        archived: false,
+        completedAt: "",
+        paymentPlan: demoDueTodayTwo,
+        payments: []
+      },
+      {
+        id: "demo-1025",
+        name: "Sarah Coleman",
+        mrn: "DEMO-1025",
+        location: "Urology World Golf Village",
+        treatments: ["Proton", "Clinic"],
+        insurance: "Demo Mutual",
+        responsibility: 0,
+        collected: 0,
+        collectionDate: dateOffset(14),
+        status: "No Responsibility",
+        noResponsibilityReason: "Demo coverage: insurance leaves no patient responsibility.",
+        statusNote: "No collection needed",
+        notes: "Second active no-responsibility example for demonstrations.",
+        archived: false,
+        completedAt: "",
+        paymentPlan: null,
+        payments: []
+      },
+      {
+        id: "demo-1026",
+        name: "Andrew Hall",
+        mrn: "DEMO-1026",
+        location: "Urology Middleburg",
+        treatments: ["Clinic", "Imaging"],
+        insurance: "SampleCare PPO",
+        responsibility: 500,
+        collected: 500,
+        collectionDate: demoPaidFull.installments[0].dueDate,
+        status: "Paid in Full",
+        statusNote: "Ready to complete",
+        notes: "Second active paid-in-full example for demonstrations.",
+        archived: false,
+        completedAt: "",
+        paymentPlan: demoPaidFull,
+        payments: [
+          { id: uid("payment"), amount: 500, date: dateOffset(-7), officeSite: "Urology Middleburg", location: "Urology Middleburg", username: "Front Desk Demo", responsibilityParty: "Ackerman", installmentId: demoPaidFull.installments[0].id, method: "Credit/Debit Card", note: "Full scheduled payment collected.", appliesToPlan: true }
+        ]
+      },
+      {
+        id: "demo-1027",
+        name: "Rachel Green",
+        mrn: "DEMO-1027",
+        location: "Amelia Island",
+        treatments: ["Proton", "Radiation (Linac/HDR/Other)"],
+        insurance: "Fictional Health Plan",
+        responsibility: 1500,
+        collected: 500,
+        collectionDate: demoClosedBalanceOne.installments[0].dueDate,
+        status: "Payment Plan",
+        notes: "Completed demo account intentionally closed with an outstanding balance.",
+        archived: true,
+        completedAt: dateOffset(-14),
+        completionReason: "Patient cancelled treatment",
+        completionNote: "Demo: treatment cancelled before the remaining scheduled responsibility was collected.",
+        paymentPlan: demoClosedBalanceOne,
+        payments: [
+          { id: uid("payment"), amount: 500, date: dateOffset(-88), officeSite: "ACC Amelia Island", location: "Amelia Island", username: "Front Desk Demo", responsibilityParty: "Ackerman", installmentId: demoClosedBalanceOne.installments[0].id, method: "Credit/Debit Card", note: "Initial ACC payment.", appliesToPlan: true }
+        ],
+        adjustments: [
+          { id: uid("adjustment"), type: "Financial Assistance", amount: 100, date: dateOffset(-20), note: "Fictional assistance example before account closure." }
+        ]
+      },
+      {
+        id: "demo-1028",
+        name: "Thomas Young",
+        mrn: "DEMO-1028",
+        location: "St. Augustine",
+        treatments: ["Imaging", "Clinic"],
+        insurance: "Example Choice Insurance",
+        responsibility: 900,
+        collected: 300,
+        collectionDate: demoClosedBalanceTwo.installments[0].dueDate,
+        status: "Payment Plan",
+        notes: "Second completed demo account intentionally closed with an outstanding balance.",
+        archived: true,
+        completedAt: dateOffset(-8),
+        completionReason: "Transferred / referred elsewhere",
+        completionNote: "Demo: patient transferred with remaining responsibility still visible in Completed Patients.",
+        paymentPlan: demoClosedBalanceTwo,
+        payments: [
+          { id: uid("payment"), amount: 300, date: dateOffset(-74), officeSite: "ACC St. Augustine", location: "St. Augustine", username: "Ian Demo", responsibilityParty: "UF", installmentId: demoClosedBalanceTwo.installments[0].id, method: "UF payment", note: "UF payment recorded before transfer.", appliesToPlan: true }
+        ],
+        adjustments: [
+          { id: uid("adjustment"), type: "Write-off", amount: 50, date: dateOffset(-10), note: "Fictional write-off example." }
+        ]
       }
     ];
   }
@@ -542,6 +812,24 @@
     return map[raw] || "Clinic";
   }
 
+  function normalizeTreatments(value) {
+    const rawValues = Array.isArray(value)
+      ? value
+      : String(value || "").split(/\s*(?:[|,+]|·)\s*/).filter(Boolean);
+    const normalized = rawValues.map(normalizeTreatmentType);
+    const unique = [...new Set(normalized)].filter((item) => TREATMENT_FLAGS.includes(item));
+    return unique.length ? unique : ["Clinic"];
+  }
+
+  function patientTreatments(patient) {
+    if (Array.isArray(patient?.treatments) && patient.treatments.length) return normalizeTreatments(patient.treatments);
+    return normalizeTreatments(patient?.treatment || "Clinic");
+  }
+
+  function treatmentLabel(patient) {
+    return patientTreatments(patient).join(" · ");
+  }
+
   function normalizeTransactionType(value) {
     const type = String(value || "Payment");
     const allowed = ["Payment", "Reversal", "Refund", "Correction Reversal", "Correction Payment"];
@@ -558,15 +846,21 @@
     const rawAmount = Number(payment.amount || 0);
     let type = normalizeTransactionType(payment.type);
     if (rawAmount < 0 && type === "Payment") type = "Reversal";
+    const responsibilityParty = String(payment.responsibilityParty || payment.party || "Ackerman") === "UF" ? "UF" : "Ackerman";
+    const legacyLocation = String(payment.location || patient.location || "Jacksonville");
     return {
       id: String(payment.id || uid("payment")),
       type,
       amount: Math.max(0, Math.abs(rawAmount)),
       date: String(payment.date || patient.collectionDate || todayIso()),
-      location: normalizeTreatmentSite(payment.location || patient.location || "Jacksonville"),
+      location: normalizeTreatmentSite(legacyLocation),
+      officeSite: String(payment.officeSite || payment.collectionSite || legacyLocation || "Not entered"),
+      username: String(payment.username || payment.actor || ""),
+      responsibilityParty,
+      installmentId: String(payment.installmentId || payment.scheduledPaymentId || ""),
       method: String(payment.method || "Other"),
       note: String(payment.note || ""),
-      appliesToPlan: Boolean(payment.appliesToPlan || payment.planPayment),
+      appliesToPlan: Boolean(payment.appliesToPlan || payment.planPayment || payment.installmentId || payment.scheduledPaymentId),
       relatedTransactionId: String(payment.relatedTransactionId || ""),
       createdAt: String(payment.createdAt || `${payment.date || patient.collectionDate || todayIso()}T12:00:00`)
     };
@@ -709,7 +1003,8 @@
       name: String(patient.name || ""),
       mrn: String(patient.mrn || ""),
       location: normalizeTreatmentSite(patient.location || "Jacksonville"),
-      treatment: normalizeTreatmentType(patient.treatment),
+      treatments: normalizeTreatments(patient.treatments || patient.treatment),
+      treatment: normalizeTreatments(patient.treatments || patient.treatment).join(" · "),
       insurance: String(patient.insurance || "Not entered"),
       responsibility: Math.max(0, Number(patient.responsibility || 0)),
       collected: Math.max(0, Number(patient.collected || 0)),
@@ -759,6 +1054,35 @@
       : [];
     base.paymentPlan = normalizePlan(patient.paymentPlan);
     if (!base.paymentPlan && arrangement === "Payment Plan") base.paymentPlan = defaultMigratedPlan(base);
+
+    // Version 2.1 migration: a historical UF verification becomes a real UF
+    // ledger entry linked to that scheduled payment. After migration the ledger,
+    // not a checkbox, is the source of truth for whether UF paid.
+    if (base.paymentPlan) {
+      base.paymentPlan.installments.forEach((installment) => {
+        if (installment.responsibilityParty !== "UF" || !installment.ufVerified) return;
+        const existing = base.payments.some((payment) => payment.installmentId === installment.id && payment.responsibilityParty === "UF" && transactionEffect(payment) > EPSILON);
+        if (!existing) {
+          base.payments.push(normalizePayment({
+            id: uid("payment-uf-migrated"),
+            type: "Payment",
+            amount: installment.amount,
+            date: installment.ufVerifiedAt || installment.dueDate || todayIso(),
+            officeSite: base.location,
+            location: base.location,
+            username: "Migrated UF verification",
+            responsibilityParty: "UF",
+            installmentId: installment.id,
+            method: "UF verification (migrated)",
+            note: "Converted from the previous Check UF verification record.",
+            appliesToPlan: true
+          }, base));
+        }
+        installment.ufVerified = false;
+        installment.ufVerifiedAt = "";
+      });
+    }
+
     base.collected = Math.max(0, Math.round(base.payments.reduce((sum, payment) => sum + transactionEffect(payment), 0) * 100) / 100);
     base.completedAt = inferCompletionDate(patient, base.payments);
     base.activity = Array.isArray(patient.activity) && patient.activity.length
@@ -788,8 +1112,15 @@
     }
   }
 
-  function ensureUfCheckDemoPatients(patients) {
-    const requiredIds = new Set(["demo-1017", "demo-1018"]);
+  function ensureDemoCoveragePatients(patients) {
+    // Keep previously edited demo records untouched, but add any missing
+    // purpose-built presentation scenarios. This lets existing Version 2
+    // browser data gain the expanded demo set without requiring a reset.
+    const requiredIds = new Set([
+      "demo-1017", "demo-1018",
+      "demo-1019", "demo-1020", "demo-1021", "demo-1022", "demo-1023",
+      "demo-1024", "demo-1025", "demo-1026", "demo-1027", "demo-1028"
+    ]);
     const existingIds = new Set(patients.map((patient) => patient.id));
     const missing = seedPatients()
       .filter((patient) => requiredIds.has(patient.id) && !existingIds.has(patient.id))
@@ -803,12 +1134,12 @@
   function loadPatients() {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) return ensureUfCheckDemoPatients(JSON.parse(stored).map(normalizePatient));
+      if (stored) return ensureDemoCoveragePatients(JSON.parse(stored).map(normalizePatient));
 
       for (const key of LEGACY_STORAGE_KEYS) {
         const legacy = localStorage.getItem(key);
         if (!legacy) continue;
-        const migrated = ensureUfCheckDemoPatients(JSON.parse(legacy).map(normalizePatient));
+        const migrated = ensureDemoCoveragePatients(JSON.parse(legacy).map(normalizePatient));
         savePatients(migrated);
         return migrated;
       }
@@ -849,7 +1180,14 @@
   }
 
   function netCollected(patient) {
-    return Math.max(0, Math.round(normalizedPayments(patient).reduce((sum, payment) => sum + transactionEffect(payment), 0) * 100) / 100);
+    return Math.round(normalizedPayments(patient).reduce((sum, payment) => sum + transactionEffect(payment), 0) * 100) / 100;
+  }
+
+  function collectedByParty(patient, party) {
+    const normalizedParty = String(party) === "UF" ? "UF" : "Ackerman";
+    return Math.round(normalizedPayments(patient)
+      .filter((payment) => payment.responsibilityParty === normalizedParty)
+      .reduce((sum, payment) => sum + transactionEffect(payment), 0) * 100) / 100;
   }
 
   function normalizedAdjustments(patient) {
@@ -863,16 +1201,41 @@
   }
 
   function ufVerifiedTotal(patient) {
-    const plan = normalizePlan(patient.paymentPlan);
-    if (!plan) return 0;
-    return Math.round(plan.installments
-      .filter((installment) => installment.responsibilityParty === "UF" && installment.ufVerified)
-      .reduce((sum, installment) => sum + installment.amount, 0) * 100) / 100;
+    // Kept as a compatibility alias for older analytics/code. In Version 2.1,
+    // UF collections are real ledger entries rather than verification checkboxes.
+    return Math.max(0, collectedByParty(patient, "UF"));
   }
 
   function amountOwed(patient) {
     if (arrangementFromLegacy(patient) === "No Responsibility") return 0;
-    return Math.max(0, Math.round((Number(patient.responsibility || 0) - netCollected(patient) - adjustmentTotal(patient) - ufVerifiedTotal(patient)) * 100) / 100);
+    return Math.max(0, Math.round((Number(patient.responsibility || 0) - netCollected(patient) - adjustmentTotal(patient)) * 100) / 100);
+  }
+
+  function financialBreakdown(patient) {
+    const plan = normalizePlan(patient.paymentPlan);
+    const accAssigned = plan ? plan.installments.filter((item) => item.responsibilityParty !== "UF").reduce((sum, item) => sum + item.amount, 0) : Number(patient.responsibility || 0);
+    const ufAssigned = plan ? plan.installments.filter((item) => item.responsibilityParty === "UF").reduce((sum, item) => sum + item.amount, 0) : 0;
+    const totalAssigned = Number(patient.responsibility || 0);
+    const accCollected = collectedByParty(patient, "Ackerman");
+    const ufCollected = collectedByParty(patient, "UF");
+    const totalCollected = accCollected + ufCollected;
+    const adjustments = adjustmentTotal(patient);
+    const round = (value) => Math.round(Number(value || 0) * 100) / 100;
+    return {
+      totalAssigned: round(totalAssigned),
+      totalCollected: round(totalCollected),
+      totalOutstanding: round(totalAssigned - totalCollected - adjustments),
+      accAssigned: round(accAssigned),
+      accCollected: round(accCollected),
+      accOutstanding: round(accAssigned - accCollected),
+      ufAssigned: round(ufAssigned),
+      ufCollected: round(ufCollected),
+      ufOutstanding: round(ufAssigned - ufCollected),
+      scheduleAssigned: round(accAssigned + ufAssigned),
+      scheduleDelta: round((accAssigned + ufAssigned) - totalAssigned),
+      collectionDelta: round(totalCollected - totalAssigned),
+      adjustments: round(adjustments)
+    };
   }
 
   function syncFinancials(patient) {
@@ -929,7 +1292,7 @@
 
   function planPaymentEvents(patient) {
     if (!patient.paymentPlan) return [];
-    const flagged = normalizedPayments(patient).filter((payment) => payment.appliesToPlan);
+    const flagged = normalizedPayments(patient).filter((payment) => payment.appliesToPlan || payment.installmentId);
     const flaggedNet = flagged.reduce((sum, payment) => sum + transactionEffect(payment), 0);
     const inferredPlanPaid = Math.max(0, netCollected(patient) - Number(patient.paymentPlan.openingCollected || 0));
     const missing = inferredPlanPaid - flaggedNet;
@@ -940,6 +1303,9 @@
         amount: missing,
         date: patient.collectionDate || patient.paymentPlan.createdDate || todayIso(),
         location: patient.location || "Not entered",
+        officeSite: patient.location || "Not entered",
+        username: "Migrated record",
+        responsibilityParty: "Ackerman",
         method: "Previously Collected",
         note: "Plan amount recorded before installment tracking was enabled.",
         appliesToPlan: true
@@ -957,6 +1323,8 @@
       number: index + 1,
       paidAmount: 0,
       remaining: installment.amount,
+      amountDue: installment.amount,
+      variance: -installment.amount,
       allocations: [],
       paidDate: "",
       status: installment.responsibilityParty === "UF" ? "UF Pending" : "Upcoming",
@@ -964,58 +1332,78 @@
       daysLate: 0,
       ufCheckDue: false
     }));
-
-    const ackermanInstallments = installments.filter((installment) => installment.responsibilityParty === "Ackerman");
+    const byId = new Map(installments.map((item) => [item.id, item]));
     const events = planPaymentEvents({ ...patient, paymentPlan: plan });
-    let unallocatedPayment = 0;
+    const unlinkedByParty = { Ackerman: [], UF: [] };
+
     events.forEach((payment) => {
-      let effect = transactionEffect(payment);
-      if (effect > EPSILON) {
-        for (const installment of ackermanInstallments) {
-          if (effect <= EPSILON) break;
-          if (installment.amount <= EPSILON) continue;
-          const needed = Math.max(0, installment.amount - installment.paidAmount);
-          if (needed <= EPSILON) continue;
-          const allocated = Math.min(needed, effect);
-          installment.paidAmount += allocated;
-          installment.allocations.push({ amount: allocated, date: payment.date, paymentId: payment.id, type: payment.type });
-          effect -= allocated;
-        }
-        if (effect > EPSILON) unallocatedPayment += effect;
-      } else if (effect < -EPSILON) {
-        let debit = Math.abs(effect);
-        for (let index = ackermanInstallments.length - 1; index >= 0 && debit > EPSILON; index -= 1) {
-          const installment = ackermanInstallments[index];
-          if (installment.paidAmount <= EPSILON) continue;
-          const removed = Math.min(installment.paidAmount, debit);
-          installment.paidAmount -= removed;
-          installment.allocations.push({ amount: -removed, date: payment.date, paymentId: payment.id, type: payment.type });
-          debit -= removed;
-        }
+      const effect = transactionEffect(payment);
+      const linked = payment.installmentId ? byId.get(payment.installmentId) : null;
+      if (linked) {
+        linked.paidAmount += effect;
+        linked.allocations.push({ amount: effect, date: payment.date, paymentId: payment.id, type: payment.type });
+      } else if (Math.abs(effect) > EPSILON) {
+        unlinkedByParty[payment.responsibilityParty === "UF" ? "UF" : "Ackerman"].push({ payment, effect });
       }
+    });
+
+    // Legacy transactions without a scheduled-payment link are allocated oldest
+    // first within their assigned party. New Version 2.1 payments are always linked.
+    ["Ackerman", "UF"].forEach((party) => {
+      const partyInstallments = installments.filter((item) => item.responsibilityParty === party);
+      unlinkedByParty[party].forEach(({ payment, effect: rawEffect }) => {
+        let effect = rawEffect;
+        if (effect > EPSILON) {
+          for (const installment of partyInstallments) {
+            if (effect <= EPSILON) break;
+            const needed = Math.max(0, installment.amount - Math.max(0, installment.paidAmount));
+            if (needed <= EPSILON) continue;
+            const allocated = Math.min(needed, effect);
+            installment.paidAmount += allocated;
+            installment.allocations.push({ amount: allocated, date: payment.date, paymentId: payment.id, type: payment.type });
+            effect -= allocated;
+          }
+          if (effect > EPSILON && partyInstallments.length) {
+            const last = partyInstallments.at(-1);
+            last.paidAmount += effect;
+            last.allocations.push({ amount: effect, date: payment.date, paymentId: payment.id, type: payment.type });
+          }
+        } else if (effect < -EPSILON) {
+          let debit = Math.abs(effect);
+          for (let index = partyInstallments.length - 1; index >= 0 && debit > EPSILON; index -= 1) {
+            const installment = partyInstallments[index];
+            const available = Math.max(0, installment.paidAmount);
+            if (available <= EPSILON) continue;
+            const removed = Math.min(available, debit);
+            installment.paidAmount -= removed;
+            installment.allocations.push({ amount: -removed, date: payment.date, paymentId: payment.id, type: payment.type });
+            debit -= removed;
+          }
+        }
+      });
     });
 
     const today = todayIso();
     installments.forEach((installment) => {
+      installment.paidAmount = Math.round(installment.paidAmount * 100) / 100;
+      installment.remaining = Math.round((installment.amount - installment.paidAmount) * 100) / 100;
+      installment.amountDue = Math.max(0, installment.remaining);
+      installment.variance = Math.round((installment.paidAmount - installment.amount) * 100) / 100;
+      const positiveAllocations = installment.allocations.filter((allocation) => allocation.amount > EPSILON);
+      installment.paidDate = positiveAllocations.length ? positiveAllocations.map((allocation) => allocation.date).sort().at(-1) : "";
+
       if (installment.responsibilityParty === "UF") {
-        installment.paidAmount = installment.ufVerified ? installment.amount : 0;
-        installment.remaining = installment.ufVerified ? 0 : installment.amount;
-        installment.paidDate = installment.ufVerifiedAt || "";
-        installment.ufCheckDue = !installment.ufVerified && installment.dueDate < today;
-        installment.status = installment.ufVerified
-          ? "UF Verified"
-          : (installment.ufCheckDue ? "UF Check Due" : "UF Pending");
+        const hasRecordedUfPayment = installment.paidAmount > EPSILON;
+        installment.ufCheckDue = !hasRecordedUfPayment && installment.dueDate < today;
         installment.daysLate = installment.ufCheckDue ? Math.max(0, daysBetween(installment.dueDate, today)) : 0;
+        if (installment.amountDue <= EPSILON) installment.status = "Paid";
+        else if (hasRecordedUfPayment) installment.status = "UF Payment Recorded";
+        else if (installment.ufCheckDue) installment.status = "UF Check Due";
+        else installment.status = "UF Pending";
         return;
       }
 
-      installment.paidAmount = Math.round(installment.paidAmount * 100) / 100;
-      installment.remaining = Math.max(0, Math.round((installment.amount - installment.paidAmount) * 100) / 100);
-      const positiveAllocations = installment.allocations.filter((allocation) => allocation.amount > 0);
-      installment.paidDate = installment.remaining <= EPSILON && positiveAllocations.length
-        ? positiveAllocations.map((allocation) => allocation.date).sort().at(-1)
-        : "";
-      if (installment.remaining <= EPSILON) {
+      if (installment.amountDue <= EPSILON) {
         installment.status = "Paid";
         installment.onTime = Boolean(installment.paidDate && installment.paidDate <= installment.dueDate);
         installment.daysLate = installment.paidDate ? Math.max(0, daysBetween(installment.dueDate, installment.paidDate)) : 0;
@@ -1024,8 +1412,6 @@
       } else if (installment.dueDate < today) {
         installment.status = "Overdue";
         installment.daysLate = Math.max(0, daysBetween(installment.dueDate, today));
-      } else if (installment.paidAmount > EPSILON) {
-        installment.status = "Partially Paid";
       } else {
         installment.status = "Upcoming";
       }
@@ -1034,34 +1420,24 @@
     const ackerman = installments.filter((installment) => installment.responsibilityParty === "Ackerman");
     const uf = installments.filter((installment) => installment.responsibilityParty === "UF");
     const total = installments.reduce((sum, installment) => sum + installment.amount, 0);
-    const paid = installments.reduce((sum, installment) => sum + installment.paidAmount, 0);
-    const completed = installments.filter((installment) => installment.status === "Paid" || installment.status === "UF Verified");
+    const completed = installments.filter((installment) => installment.amountDue <= EPSILON);
     const due = ackerman.filter((installment) => installment.dueDate <= today);
     const onTime = due.filter((installment) => installment.status === "Paid" && installment.onTime);
     const overdue = ackerman.filter((installment) => installment.status === "Overdue");
     const dueToday = ackerman.filter((installment) => installment.status === "Due Today");
     const ufChecksDue = uf.filter((installment) => installment.ufCheckDue);
-    const oldestUfCheck = ufChecksDue.length
-      ? ufChecksDue.slice().sort((a, b) => a.dueDate.localeCompare(b.dueDate))[0]
-      : null;
+    const oldestUfCheck = ufChecksDue.length ? ufChecksDue.slice().sort((a, b) => a.dueDate.localeCompare(b.dueDate))[0] : null;
     const oldestUfCheckDays = oldestUfCheck ? Math.max(1, daysBetween(oldestUfCheck.dueDate, today)) : 0;
-    const nextDue = installments.find((installment) => installment.remaining > EPSILON) || null;
-    const nextAckermanDue = ackerman.find((installment) => installment.remaining > EPSILON) || null;
+    const nextDue = installments.find((installment) => installment.amountDue > EPSILON) || null;
+    const nextAckermanDue = ackerman.find((installment) => installment.amountDue > EPSILON) || null;
     const scheduledToDate = due.reduce((sum, installment) => sum + installment.amount, 0);
-    const planPaid = Math.min(total, paid);
-    const overdueAmount = overdue.reduce((sum, installment) => sum + installment.remaining, 0);
-    const dueTodayAmount = dueToday.reduce((sum, installment) => sum + installment.remaining, 0);
-    const ufVerifiedAmount = uf.filter((installment) => installment.ufVerified).reduce((sum, installment) => sum + installment.amount, 0);
-    const ackermanTotal = ackerman.reduce((sum, installment) => sum + installment.amount, 0);
-    const ackermanPaid = ackerman.reduce((sum, installment) => sum + installment.paidAmount, 0);
-    const ackermanOwed = ackerman.reduce((sum, installment) => sum + installment.remaining, 0);
-    const ufTotal = uf.reduce((sum, installment) => sum + installment.amount, 0);
-    const ufOwed = uf.reduce((sum, installment) => sum + installment.remaining, 0);
-    const scheduleOwed = Math.max(0, total - planPaid);
-    const totalOwed = amountOwed(patient);
+    const overdueAmount = overdue.reduce((sum, installment) => sum + installment.amountDue, 0);
+    const dueTodayAmount = dueToday.reduce((sum, installment) => sum + installment.amountDue, 0);
+    const financials = financialBreakdown(patient);
     const accountResponsibility = Math.max(0, Number(patient.responsibility || 0));
-    const remainingPercent = accountResponsibility > EPSILON ? Math.min(100, (totalOwed / accountResponsibility) * 100) : 0;
-    const progressPercent = Math.max(0, 100 - remainingPercent);
+    const totalOwed = amountOwed(patient);
+    const remainingPercent = accountResponsibility > EPSILON ? Math.max(0, Math.min(100, (totalOwed / accountResponsibility) * 100)) : 0;
+    const progressPercent = accountResponsibility > EPSILON ? Math.max(0, Math.min(100, (Math.max(0, financials.totalCollected) / accountResponsibility) * 100)) : 0;
     const health = overdue.length >= 2 ? "red" : (overdue.length === 1 ? "yellow" : "green");
     const attention = overdue.length >= 2
       ? "2+ Payments Overdue"
@@ -1072,45 +1448,27 @@
           : (dueToday.length > 0 ? "Due Today" : (nextDue ? "On Track" : "Complete"))));
 
     return {
-      plan,
-      installments,
+      plan, installments,
       total: Math.round(total * 100) / 100,
-      paid: Math.round(planPaid * 100) / 100,
-      remaining: Math.max(0, Math.round((total - planPaid) * 100) / 100),
-      completedCount: completed.length,
-      totalCount: installments.length,
-      ackermanCount: ackerman.length,
-      ufCount: uf.length,
-      dueCount: due.length,
-      onTimeCount: onTime.length,
-      overdueCount: overdue.length,
-      dueTodayCount: dueToday.length,
-      ufCheckDueCount: ufChecksDue.length,
-      oldestUfCheckDate: oldestUfCheck?.dueDate || "",
-      oldestUfCheckDays,
-      overdueAmount: Math.round(overdueAmount * 100) / 100,
-      dueTodayAmount: Math.round(dueTodayAmount * 100) / 100,
-      ufVerifiedAmount: Math.round(ufVerifiedAmount * 100) / 100,
-      ackermanTotal: Math.round(ackermanTotal * 100) / 100,
-      ackermanPaid: Math.round(ackermanPaid * 100) / 100,
-      ackermanOwed: Math.round(ackermanOwed * 100) / 100,
-      ufTotal: Math.round(ufTotal * 100) / 100,
-      ufOwed: Math.round(ufOwed * 100) / 100,
-      totalOwed: Math.round(totalOwed * 100) / 100,
-      scheduleOwed: Math.round(scheduleOwed * 100) / 100,
-      remainingPercent,
-      nextDue,
-      nextAckermanDue,
-      attention,
-      health,
-      progressPercent,
+      paid: Math.round(financials.totalCollected * 100) / 100,
+      remaining: Math.max(0, Math.round(totalOwed * 100) / 100),
+      completedCount: completed.length, totalCount: installments.length,
+      ackermanCount: ackerman.length, ufCount: uf.length, dueCount: due.length, onTimeCount: onTime.length,
+      overdueCount: overdue.length, dueTodayCount: dueToday.length, ufCheckDueCount: ufChecksDue.length,
+      oldestUfCheckDate: oldestUfCheck?.dueDate || "", oldestUfCheckDays,
+      overdueAmount: Math.round(overdueAmount * 100) / 100, dueTodayAmount: Math.round(dueTodayAmount * 100) / 100,
+      ufVerifiedAmount: Math.max(0, financials.ufCollected),
+      ackermanTotal: financials.accAssigned, ackermanPaid: financials.accCollected,
+      ackermanOutstanding: financials.accOutstanding, ackermanOwed: Math.max(0, financials.accOutstanding),
+      ufTotal: financials.ufAssigned, ufPaid: financials.ufCollected,
+      ufOutstanding: financials.ufOutstanding, ufOwed: Math.max(0, financials.ufOutstanding),
+      totalCollected: financials.totalCollected, totalOutstanding: financials.totalOutstanding,
+      totalOwed: Math.round(totalOwed * 100) / 100, scheduleOwed: Math.max(0, Math.round((total - financials.totalCollected) * 100) / 100),
+      remainingPercent, nextDue, nextAckermanDue, attention, health, progressPercent,
       onTimeRate: due.length > 0 ? (onTime.length / due.length) * 100 : null,
       scheduledToDate: Math.round(scheduledToDate * 100) / 100,
-      scheduleVariance: Math.round((ackerman.reduce((sum, installment) => sum + installment.paidAmount, 0) - scheduledToDate) * 100) / 100,
-      unallocatedPayment: Math.round(unallocatedPayment * 100) / 100,
-      promiseToPayDate: plan.promiseToPayDate,
-      renegotiationCount: plan.renegotiationCount,
-      repeatedMisses: overdue.length >= 2
+      scheduleVariance: Math.round((financials.accCollected - scheduledToDate) * 100) / 100,
+      unallocatedPayment: 0, promiseToPayDate: "", renegotiationCount: plan.renegotiationCount, repeatedMisses: overdue.length >= 2
     };
   }
 
@@ -1182,7 +1540,7 @@
       "UF Check Due": { row: "health-green", pill: "uf-flag", short: "UF Check Due" },
       Complete: { row: "health-green", pill: "health-green", short: "Complete" },
       "UF Pending": { row: "health-green", pill: "uf-pending", short: "UF Pending" },
-      "UF Verified": { row: "health-green", pill: "health-green", short: "UF Verified" }
+      "UF Payment Recorded": { row: "health-green", pill: "health-green", short: "UF Recorded" }
     };
     return map[status] || map["Upcoming Collection"];
   }
@@ -1278,7 +1636,7 @@
 
     const paymentRows = tableRows(payments.map((payment) => {
       const effect = transactionEffect(payment);
-      return `<tr><td>${escapeHtml(formatDate(payment.date))}</td><td>${escapeHtml(payment.type)}</td><td class="num">${escapeHtml(currency.format(effect))}</td><td>${escapeHtml(payment.method)}</td><td>${escapeHtml(payment.location)}</td><td>${escapeHtml(payment.note || "-")}</td></tr>`;
+      return `<tr><td>${escapeHtml(formatDate(payment.date))}</td><td>${escapeHtml(payment.type)}</td><td>${payment.responsibilityParty === "UF" ? "UF" : "ACC"}</td><td class="num">${escapeHtml(currency.format(effect))}</td><td>${escapeHtml(payment.username || "-")}</td><td>${escapeHtml(payment.officeSite || payment.location || "-")}</td><td>${escapeHtml(payment.method)}</td><td>${escapeHtml(payment.note || "-")}</td></tr>`;
     }), "No payment transactions recorded.");
 
     const adjustmentRows = tableRows(adjustments.map((entry) => `<tr><td>${escapeHtml(formatDate(entry.date))}</td><td>${escapeHtml(entry.type)}</td><td class="num">${escapeHtml(currency.format(entry.amount))}</td><td>${escapeHtml(entry.note || "-")}</td></tr>`), "No adjustments recorded.");
@@ -1288,17 +1646,21 @@
       <section>
         <h2>Payment Plan</h2>
         <div class="metrics">
-          <div><span>Total responsibility</span><strong>${escapeHtml(currency.format(patient.responsibility))}</strong></div>
-          <div><span>Ackerman owes</span><strong>${escapeHtml(currency.format(plan.ackermanOwed))}</strong></div>
-          <div><span>UF owes</span><strong>${escapeHtml(currency.format(plan.ufOwed))}</strong></div>
-          <div><span>Total outstanding</span><strong>${escapeHtml(currency.format(plan.totalOwed))}</strong></div>
+          <div><span>Total patient responsibility</span><strong>${escapeHtml(currency.format(financialBreakdown(patient).totalAssigned))}</strong></div>
+          <div><span>Collected total</span><strong>${escapeHtml(currency.format(financialBreakdown(patient).totalCollected))}</strong></div>
+          <div><span>Outstanding total</span><strong>${escapeHtml(currency.format(financialBreakdown(patient).totalOutstanding))}</strong></div>
+          <div><span>ACC assigned</span><strong>${escapeHtml(currency.format(financialBreakdown(patient).accAssigned))}</strong></div>
+          <div><span>ACC collected</span><strong>${escapeHtml(currency.format(financialBreakdown(patient).accCollected))}</strong></div>
+          <div><span>ACC outstanding</span><strong>${escapeHtml(currency.format(financialBreakdown(patient).accOutstanding))}</strong></div>
+          <div><span>UF assigned</span><strong>${escapeHtml(currency.format(financialBreakdown(patient).ufAssigned))}</strong></div>
+          <div><span>UF collected</span><strong>${escapeHtml(currency.format(financialBreakdown(patient).ufCollected))}</strong></div>
+          <div><span>UF outstanding</span><strong>${escapeHtml(currency.format(financialBreakdown(patient).ufOutstanding))}</strong></div>
           <div><span>Plan progress</span><strong>${plan.progressPercent.toFixed(1)}%</strong></div>
-          <div><span>Still remaining</span><strong>${plan.remainingPercent.toFixed(1)}%</strong></div>
           <div><span>On-time rate</span><strong>${plan.onTimeRate === null ? "Not measured" : `${plan.onTimeRate.toFixed(1)}%`}</strong></div>
           <div><span>UF checks due</span><strong>${plan.ufCheckDueCount}</strong></div>
         </div>
-        <table><thead><tr><th>#</th><th>Due date</th><th>Responsible</th><th>Scheduled</th><th>Paid / verified</th><th>Remaining</th><th>Result</th></tr></thead><tbody>
-          ${plan.installments.map((item) => `<tr><td>${item.number}</td><td>${escapeHtml(formatDate(item.dueDate))}</td><td>${escapeHtml(item.responsibilityParty)}</td><td class="num">${escapeHtml(currency.format(item.amount))}</td><td class="num">${escapeHtml(currency.format(item.paidAmount))}</td><td class="num">${escapeHtml(currency.format(item.remaining))}</td><td>${escapeHtml(item.status)}${item.responsibilityParty === "UF" && item.ufVerifiedAt ? ` - checked ${escapeHtml(formatDate(item.ufVerifiedAt))}` : ""}</td></tr>`).join("")}
+        <table><thead><tr><th>#</th><th>Due date</th><th>Assigned to</th><th>Assigned amount</th><th>Collected</th><th>Outstanding</th><th>Result</th></tr></thead><tbody>
+          ${plan.installments.map((item) => `<tr><td>${item.number}</td><td>${escapeHtml(formatDate(item.dueDate))}</td><td>${item.responsibilityParty === "UF" ? "UF" : "ACC"}</td><td class="num">${escapeHtml(currency.format(item.amount))}</td><td class="num">${escapeHtml(currency.format(item.paidAmount))}</td><td class="num">${escapeHtml(currency.format(item.remaining))}</td><td>${escapeHtml(item.status)}</td></tr>`).join("")}
         </tbody></table>
       </section>` : "";
 
@@ -1344,7 +1706,7 @@
   <div><span>Arrangement</span><strong>${escapeHtml(arrangementFromLegacy(patient))}</strong></div>
   <div><span>Treatment site</span><strong>${escapeHtml(patient.location)}</strong></div>
   <div><span>Status note</span><strong>${escapeHtml(patient.statusNote || "-")}</strong></div>
-  <div><span>Treatment type</span><strong>${escapeHtml(patient.treatment)}</strong></div>
+  <div><span>Treatment type</span><strong>${escapeHtml(treatmentLabel(patient))}</strong></div>
   <div><span>Insurance</span><strong>${escapeHtml(patient.insurance)}</strong></div>
   <div><span>Collection date</span><strong>${escapeHtml(formatDate(patient.collectionDate))}</strong></div>
   <div><span>${patient.archived ? "Completed" : "Next action"}</span><strong>${escapeHtml(formatDate(patient.archived ? patient.completedAt : nextActionDate(patient)))}</strong></div>
@@ -1354,14 +1716,14 @@
   <div><span>Last updated</span><strong>${escapeHtml(formatDateTime(patient.updatedAt))}</strong></div>
 </div></section>
 <section><h2>Financial Summary</h2><div class="metrics">
-  <div><span>Responsibility</span><strong>${escapeHtml(currency.format(patient.responsibility))}</strong></div>
-  <div><span>Net collected</span><strong>${escapeHtml(currency.format(netCollected(patient)))}</strong></div>
+  <div><span>Total patient responsibility</span><strong>${escapeHtml(currency.format(financialBreakdown(patient).totalAssigned))}</strong></div>
+  <div><span>Collected total responsibility</span><strong>${escapeHtml(currency.format(financialBreakdown(patient).totalCollected))}</strong></div>
+  <div><span>Outstanding total responsibility</span><strong>${escapeHtml(currency.format(financialBreakdown(patient).totalOutstanding))}</strong></div>
   <div><span>Adjustments</span><strong>${escapeHtml(currency.format(adjustmentTotal(patient)))}</strong></div>
-  <div><span>Still owed</span><strong>${escapeHtml(currency.format(amountOwed(patient)))}</strong></div>
 </div></section>
 ${planSection}
 <section><h2>Finance Note</h2><div class="note">${escapeHtml(patient.notes || "No finance note entered.")}${patient.noResponsibilityReason ? `\n\nNo-responsibility reason: ${escapeHtml(patient.noResponsibilityReason)}` : ""}</div></section>
-<section><h2>Payment Ledger</h2><table><thead><tr><th>Date</th><th>Type</th><th>Net amount</th><th>Method</th><th>Location</th><th>Note</th></tr></thead><tbody>${paymentRows}</tbody></table></section>
+<section><h2>Payment Ledger</h2><table><thead><tr><th>Date</th><th>Type</th><th>Assigned</th><th>Net amount</th><th>Username</th><th>Office site</th><th>Method</th><th>Note</th></tr></thead><tbody>${paymentRows}</tbody></table></section>
 <section><h2>Adjustments</h2><table><thead><tr><th>Date</th><th>Type</th><th>Amount</th><th>Reason</th></tr></thead><tbody>${adjustmentRows}</tbody></table></section>
 <section><h2>Attached Document Index</h2><table><thead><tr><th>Document</th><th>Type</th><th>Size</th><th>Attached</th></tr></thead><tbody>${documentRows}</tbody></table></section>
 <section><h2>Activity Timeline</h2><ol class="activity">${activityRows}</ol></section>
@@ -1383,6 +1745,8 @@ ${planSection}
     LEGACY_STORAGE_KEYS,
     SAVED_VIEWS_KEY,
     EPSILON,
+    TREATMENT_FLAGS,
+    OFFICE_SITES,
     currency,
     todayIso,
     toIsoLocal,
@@ -1401,9 +1765,14 @@ ${planSection}
     resetPatients,
     arrangementFromLegacy,
     normalizeTreatmentType,
+    normalizeTreatments,
+    patientTreatments,
+    treatmentLabel,
     transactionEffect,
     normalizedPayments,
     netCollected,
+    collectedByParty,
+    financialBreakdown,
     normalizedAdjustments,
     adjustmentTotal,
     ufVerifiedTotal,

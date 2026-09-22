@@ -1,3 +1,21 @@
+# Version 2.1.1 — Payments Workspace UI Hotfix
+
+## Payments workspace layout
+
+- Increased the maximum width of the Payments window so the working schedule has more usable horizontal space.
+- Added horizontal scrolling inside the schedule area when needed instead of clipping controls.
+- Gave the schedule Action column a dedicated width so **Record Payment** and **Remove** are always fully visible.
+- Made the Action column sticky on the right so payment actions remain available while scrolling the schedule.
+- Standardized the two row actions into a clean two-button layout.
+
+## Active-board action button polish
+
+- Rebalanced the four action-button widths.
+- Slightly tightened the **Payments** button typography so the label no longer overflows at normal desktop widths.
+
+This hotfix changes layout only; payment logic, responsibility calculations, ledger behavior, and stored patient data are unchanged.
+
+---
 # Ackerman Patient Payment Board — Version 2 Change Log
 
 **Prepared for company presentation — September 2026**
@@ -22,6 +40,109 @@ The main goals of this version were to:
 - improve reporting and export quality
 
 ---
+
+# Version 2.1 — Company Feedback Refinement
+
+Version 2.1 incorporates the first company review of Version 2. The central change is a cleaner **assigned schedule + actual payment ledger** model.
+
+## Treatment is now multi-select
+
+Treatment is no longer limited to one category per patient. Staff can select multiple treatment flags:
+
+- Proton
+- Radiation (Linac/HDR/Other)
+- Imaging
+- Clinic
+- Women's Imaging
+
+Selected treatments display as compact badges on the board. Treatment filtering and treatment-based analytics work on each individual flag, so a patient can appropriately appear in more than one treatment category.
+
+## Financials / Plan reorganized
+
+The active board now shows three responsibility groups:
+
+**Total Patient Responsibility**
+- Total Patient Responsibility
+- Collected Total Patient Responsibility
+- Outstanding Total Patient Responsibility
+
+**ACC Assigned Patient Responsibility**
+- Assigned
+- Collected
+- Outstanding
+
+**UF Assigned Patient Responsibility**
+- Assigned
+- Collected
+- Outstanding
+
+The payment schedule controls assigned ACC/UF responsibility. Actual collections come from the payment ledger. A payment that differs from the scheduled amount changes collected/outstanding totals but does not automatically rewrite the assigned schedule. This preserves a visible plus/minus collection difference without creating automatic replacement installments.
+
+## Actions streamlined
+
+The active-board actions are now:
+
+- **Payments**
+- **Docs**
+- **View Details**
+- **Complete**
+
+The former stand-alone Pay action is replaced by the Payments workspace.
+
+## New Payments workspace
+
+Payments is now the financial editing area for the patient. Staff can:
+
+- view the Total / ACC / UF responsibility summary
+- add, remove, or edit scheduled payments
+- change a scheduled due date, assigned amount, or ACC/UF assignment
+- save the payment schedule without changing Total Patient Responsibility
+- review the actual payment ledger
+- record a payment directly beside an individual scheduled payment
+- make a financial adjustment when needed
+
+Each scheduled row shows assigned amount, collected amount, outstanding amount, status, and **Record Payment**.
+
+## Record Payment redesigned
+
+Selecting Record Payment prepopulates the patient and scheduled-payment context. Submission requires:
+
+- **Collected amount**
+- **Username / staff member**
+- **Office site**
+- **Payment method**
+- **Collection date**
+
+The payment record also stores the ACC/UF assignment and scheduled-payment link. The collected amount may be lower or higher than the scheduled amount. No automatic partial-payment schedule or replacement installment is created.
+
+Prototype office-site choices currently include ACC Mandarin, ACC Amelia Island, ACC St. Augustine, Urology World Golf Village, Urology Middleburg, and Other.
+
+## UF verification is now ledger-based
+
+The separate UF verification checkbox has been removed from the current workflow. A real UF payment record is the verification.
+
+- overdue UF scheduled payment with no recorded UF payment → **Check UF**
+- positive UF payment recorded against that schedule row → Check UF clears automatically
+- a partial UF payment can clear the verification flag while the remaining UF assigned responsibility still appears as outstanding
+
+Older prototype UF-verification records are migrated into linked UF ledger payments so existing test data remains usable.
+
+## View Details is read-only
+
+View Details is now a read-only summary page. It includes the responsibility summary, treatment flags, schedule, ledger, notes, adjustments, documents, and activity history.
+
+Financial changes belong in **Payments**, document actions in **Docs**, and archive actions in **Complete**. This makes the purpose of each active-board action clearer.
+
+## Excel reporting updated
+
+The Active and Completed Excel exports now use the new Total / ACC / UF assigned-collected-outstanding responsibility model. Completed exports continue to append chronological Payment Date / Payment Amount pairs at the end of each row.
+
+## Compatibility and migration
+
+- Existing single-treatment records become one selected treatment flag.
+- Existing multi-treatment records are retained as multiple flags.
+- Existing responsibility-party values remain compatible internally while the UI uses **ACC** terminology.
+- Historical UF checkbox verification is converted to a linked UF payment entry once, without duplicate migration on later loads.
 
 # 1. Patient Workflow Simplification
 
@@ -636,16 +757,17 @@ For the front desk:
 3. See how many payments are overdue and the total past-due amount.
 4. See the amount due today without opening the patient.
 5. Use the quick Status / Action Note when needed.
-6. Use Pay, Docs, View Details, or Complete.
+6. Use **Payments**, **Docs**, **View Details**, or **Complete**.
+7. In Payments, choose **Record Payment** beside the applicable scheduled payment and enter the actual collected amount, username, office site, method, and date.
 
 For Finance:
 
 1. Filter to Payment Plans, Overdue, Due Today, or UF Checks Due.
-2. Review Ackerman responsibility separately from UF responsibility.
+2. Review Total Patient Responsibility separately from ACC Assigned and UF Assigned responsibility.
 3. Sort UF verification oldest first.
-4. Check UF payments directly from View Details.
-5. Review responsibility, outstanding amounts, progress, and payment history.
-6. Use Statistical Analysis or formatted Excel exports for reporting.
+4. Record ACC or UF payments from the Payments workspace; recorded UF payments clear the applicable Check UF flag.
+5. Edit the assigned schedule only when Finance intentionally changes the plan.
+6. Use View Details for a read-only summary and Statistical Analysis / formatted Excel exports for reporting.
 
 ---
 
@@ -664,12 +786,72 @@ A future production deployment using real patient information would require an a
 - Simpler front-desk workflow
 - Payment Plan is now the standard collection model
 - One-payment plans are supported
-- Clear Ackerman-vs-UF responsibility
-- Dedicated Check UF workflow
+- Clear Total / ACC / UF assigned-collected-outstanding responsibility
+- Dedicated ledger-based Check UF workflow
 - Better overdue and due-today visibility
 - Required completion documentation
-- Cleaner Patient Details
+- Read-only Patient Details with financial editing centralized in Payments
 - More readable active board
 - Improved analytics
 - Professional formatted Excel reports
 - Completed accounts retain full history and can be restored
+
+
+## Version 2.1.2 — View Details UI Polish
+
+- Fixed View Details retaining the previous scroll position, which could make the top financial summary appear clipped when the dialog opened.
+- Widened and rebalanced the View Details modal while keeping the header and footer anchored.
+- Made the modal body the dedicated scroll region for more predictable navigation.
+- Added horizontal scrolling inside read-only schedule and ledger tables so right-side columns remain accessible instead of being cut off.
+- Improved section spacing, heading hierarchy, and footer/button alignment.
+- No payment, responsibility, overdue, UF, or completion logic changed in this hotfix.
+
+
+## Version 2.1.3 — Demo Coverage Expansion
+
+- Audited the fictional presentation dataset across active and completed workflows.
+- Added fresh demo patients so UF Checks Due is immediately visible even when older demo records have already been edited or verified.
+- Added two UF-only payment-plan examples with overdue UF items.
+- Added two dedicated red accounts with 2+ ACC-assigned payments overdue.
+- Added two dedicated Due Today payment-plan examples.
+- Added an additional No Responsibility patient and an additional active Paid in Full patient.
+- Added two completed accounts that intentionally retain an outstanding balance, each with a documented completion reason and financial adjustment example.
+- Expanded treatment demonstrations with multi-select treatment flags; all treatment categories now appear multiple times.
+- Verified treatment-site coverage across Jacksonville, Amelia Island, St. Augustine, Urology World Golf Village, and Urology Middleburg.
+- Existing Version 2 browser data is preserved. Missing Version 2.1.3 demo-coverage patients are appended automatically rather than resetting or overwriting edited demo records.
+- Added `DEMO_COVERAGE.md` as a quick presentation reference.
+
+---
+
+## Version 2.1.4 — Active Board Visual Hierarchy Polish
+
+This update is a visual-only experiment based on the final prototype review. No payment, responsibility, status, UF, completion, or export logic changed.
+
+### Active board improvements
+
+- Increased row breathing room without materially increasing overall density.
+- Strengthened the patient name as the primary text anchor in each row.
+- Gave Treatment and Site / Insurance slightly more column space and cleaner spacing.
+- Made **Past due** and **Due today** dollar amounts more visually prominent directly beneath the status.
+- Reduced the visual weight of the quick-note field relative to the actionable status information.
+- Tightened the Financials / Plan block while preserving all Total / ACC / UF assigned, collected, and outstanding values.
+- Standardized action-button height, typography, radius, and spacing while preserving the four horizontal actions: **Payments, Docs, View Details, Complete**.
+- Rebalanced active-board column widths to improve scanability.
+
+
+## Version 2.1.5 — Collapsible Active Patient Rows
+
+- Added an individual expand/collapse arrow beside every patient name on the active board.
+- Added a global **Collapse All / Expand All** button that applies to the currently visible/filtered patient list.
+- Expanded rows preserve the full Version 2.1.4 board detail.
+- Collapsed rows remain operationally useful and continue to show:
+  - current status
+  - patient name
+  - treatment flag(s)
+  - treatment site
+  - past-due, due-today, or next-payment amount as applicable
+  - total outstanding balance
+  - next due date/payment information
+  - Payments, Docs, View Details, and Complete actions
+- Secondary detail such as insurance, MRN/update metadata, quick note, full Total/ACC/UF financial breakdown, and progress detail is hidden in collapsed mode to reduce row height.
+- Row collapse is a UI-only state and does not alter patient data or reporting.

@@ -160,6 +160,7 @@
         <div class="toolbar-actions">
           <div class="toolbar-actions-left">
             <button class="btn btn-primary" id="addPatientButton" type="button">+ Add Patient</button>
+            <button class="btn btn-secondary" id="toggleAllRowsButton" type="button" aria-expanded="true" title="Collapse all visible patient rows">▾ Collapse All</button>
           </div>
           <div class="toolbar-actions-right">
             <button class="btn btn-secondary" id="clearFiltersButton" type="button">Clear Filters</button>
@@ -188,12 +189,12 @@
         <table class="payment-table" aria-describedby="workQueueDescription">
           <caption class="sr-only">Active patient payment work queue</caption>
           <colgroup>
-            <col style="width: 13%">
+            <col style="width: 14%">
             <col style="width: 15%">
+            <col style="width: 13%">
             <col style="width: 12%">
-            <col style="width: 11%">
-            <col style="width: 20%">
-            <col style="width: 10%">
+            <col style="width: 18%">
+            <col style="width: 9%">
             <col style="width: 19%">
           </colgroup>
           <thead>
@@ -250,15 +251,16 @@
               <option>Urology Middleburg</option>
             </select>
           </div>
-          <div class="field">
-            <label for="patientTreatment">Treatment type</label>
-            <select id="patientTreatment" required>
-                <option>Proton</option>
-                <option>Radiation (Linac/HDR/Other)</option>
-                <option>Imaging</option>
-                <option>Clinic</option>
-                <option>Women's Imaging</option>
-              </select>
+          <div class="field full">
+            <label>Treatment flags</label>
+            <div class="treatment-flag-picker" id="patientTreatmentFlags" role="group" aria-label="Treatment flags">
+              <label><input type="checkbox" name="patientTreatmentFlag" value="Proton"> <span>Proton</span></label>
+              <label><input type="checkbox" name="patientTreatmentFlag" value="Radiation (Linac/HDR/Other)"> <span>Radiation (Linac/HDR/Other)</span></label>
+              <label><input type="checkbox" name="patientTreatmentFlag" value="Imaging"> <span>Imaging</span></label>
+              <label><input type="checkbox" name="patientTreatmentFlag" value="Clinic"> <span>Clinic</span></label>
+              <label><input type="checkbox" name="patientTreatmentFlag" value="Women's Imaging"> <span>Women's Imaging</span></label>
+            </div>
+            <span class="field-hint">Select every treatment category that applies. Most patients may have more than one.</span>
           </div>
           <div class="field">
             <label for="patientInsurance">Insurance</label>
@@ -268,11 +270,7 @@
             <label for="patientResponsibility">Patient responsibility</label>
             <input id="patientResponsibility" type="number" min="0" step="0.01" required>
           </div>
-          <div class="field">
-            <label for="patientCollected">Already collected</label>
-            <input id="patientCollected" type="number" min="0" step="0.01" value="0" required>
-            <span class="field-hint" id="collectedHint">For a new record only. Later payments use Pay.</span>
-          </div>
+          <input id="patientCollected" type="hidden" value="0">
           <div class="field">
             <label for="patientDate">Collection date</label>
             <input id="patientDate" type="date" required>
@@ -353,40 +351,98 @@
     </form>
   </dialog>
 
+  <dialog id="paymentsDialog" class="wide-dialog payments-workspace-dialog">
+    <div class="modal-header">
+      <div>
+        <h2 id="paymentsTitle">Payments</h2>
+        <p id="paymentsSubtitle">Edit the assigned schedule and record ACC or UF payments.</p>
+      </div>
+      <button class="icon-button" type="button" data-close="paymentsDialog" aria-label="Close">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div id="paymentsFinancialSummary"></div>
+
+      <section class="detail-section payment-workspace-section">
+        <div class="detail-section-heading">
+          <div>
+            <h3>Payment Schedule</h3>
+            <p>Assigned amounts remain unchanged when an actual collection differs. Edit the schedule only when Finance intentionally changes the assignment.</p>
+          </div>
+          <div class="modal-footer-group">
+            <button class="btn btn-secondary btn-small" id="addScheduledPaymentButton" type="button">+ Add Scheduled Payment</button>
+            <button class="btn btn-primary btn-small" id="savePaymentScheduleButton" type="button">Save Schedule</button>
+          </div>
+        </div>
+        <div class="history-wrap">
+          <table class="history-table payments-schedule-table">
+            <thead><tr><th>#</th><th>Due date</th><th>Assigned amount</th><th>Assigned to</th><th>Collected</th><th>Outstanding</th><th>Status</th><th>Action</th></tr></thead>
+            <tbody id="paymentsScheduleBody"></tbody>
+          </table>
+        </div>
+        <div class="plan-total-row manual" id="paymentsScheduleSummary"></div>
+      </section>
+
+      <section class="detail-section payment-workspace-section">
+        <div class="detail-section-heading">
+          <div>
+            <h3>Payment Ledger</h3>
+            <p>The ledger records what actually happened. Corrections create separate reversal/refund entries so the history stays auditable.</p>
+          </div>
+        </div>
+        <div id="paymentsLedger"></div>
+      </section>
+    </div>
+    <div class="modal-footer split">
+      <div class="modal-footer-group">
+        <button class="btn btn-secondary" id="paymentsAdjustmentButton" type="button">Financial Adjustment</button>
+      </div>
+      <div class="modal-footer-group">
+        <button class="btn btn-ghost" type="button" data-close="paymentsDialog">Close</button>
+      </div>
+    </div>
+  </dialog>
+
   <dialog id="paymentDialog">
     <form id="paymentForm" method="dialog">
       <div class="modal-header">
         <div>
           <h2>Record Payment</h2>
-          <p>Today's date and the patient's treatment site are entered automatically.</p>
+          <p>Record the actual amount collected against this scheduled ACC or UF payment.</p>
         </div>
         <button class="icon-button" type="button" data-close="paymentDialog" aria-label="Close">&times;</button>
       </div>
       <div class="modal-body">
         <input type="hidden" id="paymentPatientId">
-        <div class="payment-summary">
+        <input type="hidden" id="paymentInstallmentId">
+        <input type="hidden" id="paymentResponsibilityParty">
+        <div class="payment-summary payment-summary-six">
           <div class="mini-card"><span>Patient</span><strong id="paymentPatientName">-</strong></div>
           <div class="mini-card"><span>MRN</span><strong id="paymentPatientMrn">-</strong></div>
-          <div class="mini-card"><span>Current balance</span><strong id="paymentBalance">$0</strong></div>
+          <div class="mini-card"><span>Assigned to</span><strong id="paymentAssignedParty">-</strong></div>
+          <div class="mini-card"><span>Scheduled amount</span><strong id="paymentScheduledAmount">$0</strong></div>
+          <div class="mini-card"><span>Already collected</span><strong id="paymentAlreadyCollected">$0</strong></div>
+          <div class="mini-card"><span>Scheduled outstanding</span><strong id="paymentBalance">$0</strong></div>
         </div>
-        <div class="plan-payment-context" id="paymentPlanContext" hidden></div>
+        <div class="plan-payment-context" id="paymentPlanContext"></div>
         <div class="form-grid">
           <div class="field">
-            <label for="paymentAmount">Amount collected</label>
+            <label for="paymentAmount">Collected amount</label>
             <input id="paymentAmount" type="number" min="0.01" step="0.01" required>
+            <span class="field-hint">The recorded amount may differ from the assigned amount. The assigned schedule is not changed automatically.</span>
           </div>
           <div class="field">
-            <label for="paymentDate">Collection date</label>
-            <input id="paymentDate" type="date" required>
+            <label for="paymentUsername">Username / staff member</label>
+            <input id="paymentUsername" maxlength="100" required placeholder="Example: Front Desk - Jane">
           </div>
           <div class="field">
-            <label for="paymentLocation">Treatment site</label>
-            <select id="paymentLocation" required>
-              <option>Jacksonville</option>
-              <option>Amelia Island</option>
-              <option>St. Augustine</option>
+            <label for="paymentOfficeSite">Office site</label>
+            <select id="paymentOfficeSite" required>
+              <option>ACC Mandarin</option>
+              <option>ACC Amelia Island</option>
+              <option>ACC St. Augustine</option>
               <option>Urology World Golf Village</option>
               <option>Urology Middleburg</option>
+              <option>Other</option>
             </select>
           </div>
           <div class="field">
@@ -395,9 +451,14 @@
               <option>Credit/Debit Card</option>
               <option>Check</option>
               <option>Cash</option>
+              <option>ACH</option>
               <option>Online Portal</option>
               <option>Other</option>
             </select>
+          </div>
+          <div class="field">
+            <label for="paymentDate">Collection date</label>
+            <input id="paymentDate" type="date" required>
           </div>
           <div class="field full">
             <label for="paymentNote">Note</label>
@@ -407,7 +468,7 @@
       </div>
       <div class="modal-footer">
         <button class="btn btn-secondary" type="button" data-close="paymentDialog">Cancel</button>
-        <button class="btn btn-primary" type="submit">Save Payment</button>
+        <button class="btn btn-primary" type="submit">Submit Payment Record</button>
       </div>
     </form>
   </dialog>
@@ -421,18 +482,9 @@
       <button class="icon-button" type="button" data-close="detailsDialog" aria-label="Close">&times;</button>
     </div>
     <div class="modal-body" id="detailsBody"></div>
-    <div class="modal-footer split">
-      <div class="modal-footer-group">
-        <button class="btn btn-secondary" id="detailsEditButton" type="button">Edit Account</button>
-        <button class="btn btn-secondary" id="detailsFinancialButton" type="button">Adjustments</button>
-        <button class="btn btn-success" id="detailsCompleteButton" type="button">Complete &amp; Archive</button>
-      </div>
-      <div class="modal-footer-group">
-        <button class="btn btn-secondary" id="detailsPrintButton" type="button">Print Summary</button>
-        <button class="btn btn-documents" id="detailsDocumentsButton" type="button">Documents</button>
-        <button class="btn btn-primary" id="detailsPaymentButton" type="button">Pay</button>
-        <button class="btn btn-ghost" type="button" data-close="detailsDialog">Close</button>
-      </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" id="detailsPrintButton" type="button">Print Summary</button>
+      <button class="btn btn-ghost" type="button" data-close="detailsDialog">Close</button>
     </div>
   </dialog>
 

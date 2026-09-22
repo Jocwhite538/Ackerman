@@ -2852,7 +2852,7 @@ dialog::backdrop {
 
 .payment-board-page .actions {
   display: grid;
-  grid-template-columns: .78fr .78fr 1.35fr 1fr;
+  grid-template-columns: 1.12fr .72fr 1.34fr 1fr;
   gap: 6px;
   width: 100%;
   align-items: stretch;
@@ -2861,11 +2861,19 @@ dialog::backdrop {
 .payment-board-page .board-action-btn {
   min-width: 0;
   min-height: 38px;
-  padding: 8px 7px;
+  padding: 8px 6px;
   border-radius: 8px;
-  font-size: .75rem;
+  font-size: .74rem;
   font-weight: 820;
   white-space: nowrap;
+}
+
+/* "Payments" is the longest first-row action label. Give it a little more
+   room and slightly tighter type so it never clips at normal desktop widths. */
+.payment-board-page .board-action-btn[data-action="payments"] {
+  padding-inline: 5px;
+  font-size: .70rem;
+  letter-spacing: -.012em;
 }
 
 @media (max-width: 1300px) {
@@ -2878,3 +2886,667 @@ dialog::backdrop {
 }
 
 /* Version 2 final presentation font polish: active-board working text enlarged ~5–8%. */
+
+/* Version 2.1 boss-feedback workflow -------------------------------------- */
+.treatment-flag-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 0 2px;
+}
+
+.treatment-flag-picker label,
+.treatment-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #b9cbd4;
+  border-radius: 999px;
+  background: #f5fafb;
+  color: #274454;
+  font-weight: 780;
+}
+
+.treatment-flag-picker label {
+  padding: 7px 10px;
+  cursor: pointer;
+  font-size: .78rem;
+}
+
+.treatment-flag-picker label:has(input:checked) {
+  border-color: var(--teal-700);
+  background: #eaf8f9;
+  box-shadow: 0 0 0 2px rgba(8, 127, 140, .10);
+}
+
+.treatment-flag-picker input {
+  width: auto;
+  margin: 0;
+  accent-color: var(--teal-700);
+}
+
+.treatment-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.treatment-badge {
+  padding: 4px 7px;
+  font-size: .72rem;
+  line-height: 1.2;
+  white-space: normal;
+}
+
+.payment-board-page .treatment-badge {
+  font-size: .80rem;
+  padding: 5px 8px;
+}
+
+.responsibility-financial-stack {
+  gap: 7px;
+}
+
+.financial-group {
+  padding-top: 5px;
+  border-top: 1px solid rgba(107, 132, 146, .24);
+}
+
+.financial-group:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.financial-group-title {
+  margin-bottom: 3px;
+  color: #284858;
+  font-size: .68rem;
+  font-weight: 850;
+  line-height: 1.2;
+  text-transform: uppercase;
+  letter-spacing: .025em;
+}
+
+.payment-board-page .financial-group-title {
+  font-size: .73rem;
+}
+
+.financial-adjustment-note {
+  margin-top: 2px;
+  padding-top: 4px;
+  border-top: 1px dashed #c7d3da;
+}
+
+.payments-workspace-dialog {
+  width: min(1380px, calc(100vw - 24px));
+  max-width: 1380px;
+}
+
+/* The payments workspace is intentionally wider than the other dialogs.
+   The schedule is the working surface, so preserve every control rather than
+   clipping the far-right action column. */
+.payments-workspace-dialog .modal-body {
+  padding-inline: 14px;
+}
+
+.responsibility-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.responsibility-summary-card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(21, 45, 59, .04);
+}
+
+.responsibility-summary-card.total { border-top: 4px solid var(--navy-700); }
+.responsibility-summary-card.acc { border-top: 4px solid var(--teal-700); }
+.responsibility-summary-card.uf { border-top: 4px solid #287aa8; }
+
+.responsibility-summary-card h3 {
+  margin: 0 0 9px;
+  color: var(--navy-800);
+  font-size: .82rem;
+}
+
+.responsibility-summary-card > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  padding: 3px 0;
+  font-size: .78rem;
+}
+
+.responsibility-summary-card > div span { color: #58707f; }
+.responsibility-summary-card > div strong {
+  color: var(--navy-900);
+  font-variant-numeric: tabular-nums;
+}
+
+.payment-workspace-section {
+  margin-top: 16px;
+}
+
+.payments-workspace-dialog .history-wrap {
+  overflow-x: auto;
+  scrollbar-gutter: stable;
+}
+
+.payments-schedule-table {
+  min-width: 1180px;
+  table-layout: auto;
+}
+
+/* Give schedule columns deliberate widths so the editable controls stay
+   readable and the action column always has room for both buttons. */
+.payments-schedule-table th:nth-child(1),
+.payments-schedule-table td:nth-child(1) { width: 44px; min-width: 44px; }
+.payments-schedule-table th:nth-child(2),
+.payments-schedule-table td:nth-child(2) { width: 150px; min-width: 150px; }
+.payments-schedule-table th:nth-child(3),
+.payments-schedule-table td:nth-child(3) { width: 155px; min-width: 155px; }
+.payments-schedule-table th:nth-child(4),
+.payments-schedule-table td:nth-child(4) { width: 125px; min-width: 125px; }
+.payments-schedule-table th:nth-child(5),
+.payments-schedule-table td:nth-child(5) { width: 118px; min-width: 118px; }
+.payments-schedule-table th:nth-child(6),
+.payments-schedule-table td:nth-child(6) { width: 124px; min-width: 124px; }
+.payments-schedule-table th:nth-child(7),
+.payments-schedule-table td:nth-child(7) { width: 118px; min-width: 118px; }
+.payments-schedule-table th:nth-child(8),
+.payments-schedule-table td:nth-child(8) {
+  width: 220px;
+  min-width: 220px;
+}
+
+.payments-schedule-table input[type="date"],
+.payments-schedule-table input[type="number"],
+.payments-schedule-table select {
+  width: 100%;
+  min-width: 0;
+  font-size: .76rem;
+}
+
+/* Keep the schedule action available while horizontally scrolling on smaller
+   screens. This also prevents the Remove button from disappearing off-screen. */
+.payments-schedule-table th:last-child,
+.payments-schedule-table td:last-child {
+  position: sticky;
+  right: 0;
+  z-index: 2;
+  box-shadow: -8px 0 12px -12px rgba(17, 46, 63, .45);
+}
+.payments-schedule-table th:last-child {
+  z-index: 3;
+  background: #f7fafb;
+}
+.payments-schedule-table td:last-child { background: #ffffff; }
+
+.schedule-row-actions {
+  display: grid;
+  grid-template-columns: minmax(118px, 1fr) 74px;
+  gap: 6px;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.schedule-row-actions .btn {
+  width: 100%;
+  min-width: 0;
+  padding-inline: 7px;
+}
+
+.payment-ledger-table {
+  min-width: 1120px;
+}
+
+.payment-summary-six {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+#paymentPlanContext {
+  margin: 10px 0 14px;
+  padding: 10px 12px;
+  border: 1px solid #c7d8df;
+  border-radius: 9px;
+  background: #f5fafb;
+  color: #304d5c;
+  font-size: .78rem;
+}
+
+@media (max-width: 900px) {
+  .responsibility-summary-grid { grid-template-columns: 1fr; }
+  .payment-summary-six { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 560px) {
+  .payment-summary-six { grid-template-columns: 1fr; }
+}
+
+/* Version 2.1.1 UI hotfix: wider Payments workspace, protected schedule actions,
+   and main-board Payments button text-fit polish. */
+
+
+/* Version 2.1.2 View Details polish
+   Keep header/footer anchored, reset the content viewport cleanly, and allow
+   wide schedule/ledger tables to scroll inside the summary instead of clipping. */
+#detailsDialog {
+  width: min(1180px, calc(100vw - 36px));
+  max-width: 1180px;
+  max-height: 92vh;
+}
+
+#detailsDialog[open] {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  height: min(88vh, 900px);
+  overflow: hidden;
+}
+
+#detailsDialog .modal-header {
+  padding: 18px 20px;
+}
+
+#detailsDialog .modal-header h2 {
+  font-size: 1.18rem;
+}
+
+#detailsDialog .modal-body {
+  min-height: 0;
+  max-height: none;
+  padding: 20px 20px 26px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-gutter: stable;
+  scroll-padding-top: 14px;
+}
+
+#detailsDialog .responsibility-summary-grid {
+  margin-bottom: 20px;
+}
+
+#detailsDialog .detail-section {
+  margin-top: 22px;
+  padding-top: 19px;
+  border-top: 1px solid #e3eaee;
+}
+
+#detailsDialog .detail-section:first-of-type {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+#detailsDialog .detail-section h3 {
+  font-size: 1rem;
+}
+
+#detailsDialog .detail-grid {
+  gap: 11px 18px;
+}
+
+#detailsDialog .history-wrap {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-gutter: stable;
+}
+
+#detailsDialog .history-table {
+  margin: 0;
+}
+
+#detailsDialog .modal-footer {
+  min-height: 62px;
+  padding: 11px 20px;
+  background: #f7fafb;
+  box-shadow: 0 -6px 18px rgba(18, 50, 74, .05);
+}
+
+#detailsDialog .modal-footer .btn {
+  min-height: 40px;
+  padding-inline: 15px;
+}
+
+@media (max-width: 760px) {
+  #detailsDialog {
+    width: calc(100vw - 18px);
+  }
+
+  #detailsDialog[open] {
+    height: 94vh;
+    max-height: 94vh;
+  }
+
+  #detailsDialog .modal-header,
+  #detailsDialog .modal-body,
+  #detailsDialog .modal-footer {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+}
+
+/* Version 2.1.4 — active-board visual hierarchy polish -------------------- */
+/* This pass is intentionally visual only. It does not change status,
+   responsibility, payment, UF, completion, or reporting logic. */
+
+/* Give each row a little more breathing room while preserving density. */
+.payment-board-page .payment-table th,
+.payment-board-page .payment-table td {
+  padding-top: 12px;
+  padding-bottom: 12px;
+  padding-left: 10px;
+  padding-right: 10px;
+}
+
+.payment-board-page .payment-table tbody tr:hover td {
+  background: rgba(248, 251, 252, .72);
+}
+
+/* Patient identity should be the clearest text anchor in each row. */
+.payment-board-page .patient-link {
+  font-size: 1.03rem;
+  line-height: 1.24;
+  letter-spacing: -.008em;
+}
+
+.payment-board-page .mrn {
+  margin-top: 4px;
+}
+
+.payment-board-page .cell-tertiary {
+  margin-top: 6px;
+}
+
+/* Treatment, site, and insurance get slightly more room and cleaner spacing. */
+.payment-board-page .treatment-badges {
+  gap: 6px;
+  align-content: flex-start;
+}
+
+.payment-board-page .treatment-badge {
+  padding: 6px 9px;
+  border-color: #aec5cf;
+  background: #f4fafb;
+  font-size: .82rem;
+  line-height: 1.18;
+}
+
+.payment-board-page td[data-label="Site & Insurance"] .cell-primary {
+  font-size: 1rem;
+  line-height: 1.28;
+}
+
+.payment-board-page td[data-label="Site & Insurance"] .cell-secondary {
+  margin-top: 5px;
+  font-size: .92rem;
+  line-height: 1.28;
+}
+
+/* Make the immediately actionable dollar amount the strongest secondary
+   signal in Status, without competing with the primary status pill. */
+.payment-board-page .status-stack {
+  gap: 6px;
+}
+
+.payment-board-page .status-overdue-amount,
+.payment-board-page .status-due-amount {
+  margin-top: 1px;
+  padding: 6px 8px;
+  border-radius: 7px;
+  font-size: .88rem;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.payment-board-page .status-overdue-amount {
+  border: 1px solid rgba(159, 29, 23, .18);
+  background: rgba(255, 240, 239, .88);
+}
+
+.payment-board-page .status-due-amount {
+  border: 1px solid rgba(138, 87, 0, .18);
+  background: rgba(255, 248, 228, .9);
+}
+
+.payment-board-page .status-overdue-amount strong,
+.payment-board-page .status-due-amount strong {
+  font-size: .98rem;
+  font-weight: 900;
+}
+
+/* Keep quick notes useful but visually below the actual work status. */
+.payment-board-page .status-note-input {
+  margin-top: 8px;
+  font-size: .80rem;
+  background: rgba(255, 255, 255, .92);
+}
+
+/* Tighten the dense responsibility block so the board spends more width on
+   treatment/site context while keeping all boss-requested financial values. */
+.payment-board-page .responsibility-financial-stack {
+  gap: 5px;
+}
+
+.payment-board-page .financial-group {
+  padding-top: 4px;
+}
+
+.payment-board-page .financial-group-title {
+  margin-bottom: 2px;
+  font-size: .70rem;
+  line-height: 1.12;
+  letter-spacing: .018em;
+}
+
+.payment-board-page .financial-line {
+  gap: 5px;
+  font-size: .75rem;
+  line-height: 1.22;
+}
+
+.payment-board-page .financial-line strong {
+  font-size: .81rem;
+}
+
+.payment-board-page .financial-line.balance {
+  margin-top: 1px;
+  padding: 2px 4px;
+  border-radius: 5px;
+  background: rgba(244, 248, 250, .88);
+}
+
+.payment-board-page .financial-line.balance strong {
+  font-size: .90rem;
+}
+
+.payment-board-page .plan-progress-block {
+  margin-top: 7px;
+}
+
+/* Four predictable action controls: same height/type treatment, while the
+   longer labels receive proportionally more width. */
+.payment-board-page .actions {
+  grid-template-columns: 1.20fr .72fr 1.38fr 1.04fr;
+  gap: 7px;
+}
+
+.payment-board-page .board-action-btn,
+.payment-board-page .board-action-btn[data-action="payments"] {
+  min-height: 42px;
+  padding: 9px 6px;
+  border-radius: 9px;
+  font-size: .72rem;
+  font-weight: 830;
+  letter-spacing: 0;
+}
+
+@media (max-width: 1300px) {
+  .payment-board-page .payment-table th,
+  .payment-board-page .payment-table td {
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+}
+
+
+/* Version 2.1.5 — collapsible active patient rows ------------------------- */
+.patient-cell-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  min-width: 0;
+}
+
+.row-collapse-toggle {
+  width: 27px;
+  height: 27px;
+  flex: 0 0 27px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: -2px;
+  padding: 0;
+  border: 1px solid #b9ccd5;
+  border-radius: 7px;
+  background: rgba(255,255,255,.88);
+  color: #17445f;
+  font-size: 1rem;
+  font-weight: 900;
+  line-height: 1;
+  cursor: pointer;
+  transition: background .12s ease, border-color .12s ease, transform .12s ease;
+}
+
+.row-collapse-toggle:hover {
+  background: #ffffff;
+  border-color: #7ea7b8;
+}
+
+.row-collapse-toggle:focus-visible {
+  outline: 3px solid rgba(0, 134, 146, .22);
+  outline-offset: 2px;
+}
+
+.collapsed-financial-summary {
+  display: none;
+}
+
+.patient-row.is-collapsed td {
+  padding-top: 9px !important;
+  padding-bottom: 9px !important;
+  vertical-align: middle;
+}
+
+.patient-row.is-collapsed .mrn,
+.patient-row.is-collapsed .cell-tertiary,
+.patient-row.is-collapsed td[data-label="Site & Insurance"] .cell-secondary,
+.patient-row.is-collapsed .status-note-input,
+.patient-row.is-collapsed .status-stack .status-subline,
+.patient-row.is-collapsed .status-overdue-amount,
+.patient-row.is-collapsed .status-due-amount,
+.patient-row.is-collapsed .expanded-financial-content {
+  display: none !important;
+}
+
+.patient-row.is-collapsed .patient-cell-heading {
+  align-items: center;
+}
+
+.patient-row.is-collapsed .patient-link {
+  font-size: .98rem;
+}
+
+.patient-row.is-collapsed .treatment-badges {
+  gap: 4px;
+}
+
+.patient-row.is-collapsed .treatment-badge {
+  padding: 4px 7px;
+  font-size: .75rem;
+}
+
+.patient-row.is-collapsed td[data-label="Site & Insurance"] .cell-primary {
+  font-size: .90rem;
+}
+
+.patient-row.is-collapsed .collapsed-financial-summary {
+  display: grid;
+  gap: 3px;
+}
+
+.collapsed-financial-primary {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  color: #315364;
+  font-size: .76rem;
+  line-height: 1.2;
+}
+
+.collapsed-financial-primary strong {
+  color: #102f43;
+  font-size: .93rem;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.collapsed-financial-secondary {
+  color: #637a86;
+  font-size: .71rem;
+  line-height: 1.2;
+}
+
+.patient-row.is-collapsed .date-kicker {
+  font-size: .67rem;
+  line-height: 1.15;
+}
+
+.patient-row.is-collapsed .date-main {
+  margin-top: 2px;
+  font-size: .86rem;
+}
+
+.patient-row.is-collapsed .date-relative {
+  margin-top: 1px;
+  font-size: .70rem;
+}
+
+.patient-row.is-collapsed .actions {
+  gap: 5px;
+}
+
+.patient-row.is-collapsed .board-action-btn,
+.patient-row.is-collapsed .board-action-btn[data-action="payments"] {
+  min-height: 36px;
+  padding-top: 7px;
+  padding-bottom: 7px;
+}
+
+#toggleAllRowsButton {
+  min-width: 126px;
+}
+
+@media (max-width: 760px) {
+  .patient-row.is-collapsed .mrn,
+  .patient-row.is-collapsed .cell-tertiary,
+  .patient-row.is-collapsed td[data-label="Site & Insurance"] .cell-secondary,
+  .patient-row.is-collapsed .status-note-input,
+  .patient-row.is-collapsed .status-stack .status-subline,
+  .patient-row.is-collapsed .status-overdue-amount,
+  .patient-row.is-collapsed .status-due-amount,
+  .patient-row.is-collapsed .expanded-financial-content {
+    display: block !important;
+  }
+
+  .patient-row.is-collapsed .collapsed-financial-summary {
+    display: none;
+  }
+}

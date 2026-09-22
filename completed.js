@@ -49,10 +49,10 @@
 
   function populateFilters() {
     const completed = patients.filter((patient) => patient.archived);
-    const unique = (key) => [...new Set(completed.map((patient) => patient[key]).filter(Boolean))]
-      .sort((a, b) => a.localeCompare(b));
-    setSelectOptions(elements.location, unique("location"), "All sites");
-    setSelectOptions(elements.treatment, unique("treatment"), "All treatments");
+    const locations = [...new Set(completed.map((patient) => patient.location).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+    const treatments = [...new Set(completed.flatMap((patient) => D.patientTreatments(patient)))].sort((a, b) => a.localeCompare(b));
+    setSelectOptions(elements.location, locations, "All sites");
+    setSelectOptions(elements.treatment, treatments, "All treatments");
   }
 
   function parseSort(value) {
@@ -92,13 +92,13 @@
     return patients
       .filter((patient) => {
         if (!patient.archived) return false;
-        const searchable = [patient.name, patient.mrn, patient.location, patient.treatment, patient.insurance, patient.statusNote]
+        const searchable = [patient.name, patient.mrn, patient.location, D.treatmentLabel(patient), patient.insurance, patient.statusNote]
           .join(" ").toLowerCase();
         return (!query || searchable.includes(query))
           && (!from || patient.completedAt >= from)
           && (!to || patient.completedAt <= to)
           && (elements.location.value === "all" || patient.location === elements.location.value)
-          && (elements.treatment.value === "all" || patient.treatment === elements.treatment.value)
+          && (elements.treatment.value === "all" || D.patientTreatments(patient).includes(elements.treatment.value))
           && matchesCompletionType(patient);
       })
       .sort(comparePatients);
@@ -149,7 +149,7 @@
           ${patient.statusNote ? `<div class="status-note-readonly">${D.escapeHtml(patient.statusNote)}</div>` : ""}
         </td>
         <td data-label="Treatment">
-          <div class="cell-primary">${D.escapeHtml(patient.treatment)}</div>
+          <div class="treatment-badges">${D.patientTreatments(patient).map((treatment) => `<span class="treatment-badge">${D.escapeHtml(treatment)}</span>`).join("")}</div>
         </td>
         <td data-label="Site & Insurance">
           <div class="cell-primary">${D.escapeHtml(patient.location)}</div>
@@ -228,20 +228,25 @@
   function paymentHistoryHtml(patient) {
     const payments = D.normalizedPayments(patient).sort((a, b) => `${b.date}|${b.createdAt}`.localeCompare(`${a.date}|${a.createdAt}`));
     if (!payments.length) return '<div class="notes-box">No payment transactions were recorded.</div>';
+    const plan = D.planSummary(patient);
+    const installmentNumbers = new Map((plan?.installments || []).map((item) => [item.id, item.number]));
     return `
       <div class="history-wrap">
-        <table class="history-table">
-          <thead><tr><th>Date</th><th>Type</th><th>Amount</th><th>Site</th><th>Method</th><th>Plan</th><th>Note</th></tr></thead>
+        <table class="history-table payment-ledger-table">
+          <thead><tr><th>Date</th><th>Type</th><th>Assigned</th><th>Scheduled Payment</th><th>Amount</th><th>Username</th><th>Office Site</th><th>Method</th><th>Note</th></tr></thead>
           <tbody>${payments.map((payment) => {
             const effect = D.transactionEffect(payment);
+            const scheduledNumber = payment.installmentId ? installmentNumbers.get(payment.installmentId) : null;
             return `<tr>
               <td>${D.formatDate(payment.date)}</td>
               <td><span class="ledger-type ${effect < 0 ? "negative" : "positive"}">${D.escapeHtml(payment.type)}</span></td>
+              <td><strong>${payment.responsibilityParty === "UF" ? "UF" : "ACC"}</strong></td>
+              <td>${scheduledNumber ? `Payment ${scheduledNumber}` : "—"}</td>
               <td><strong class="${effect < 0 ? "negative-money" : ""}">${effect < 0 ? "−" : ""}${D.currency.format(payment.amount)}</strong></td>
-              <td>${D.escapeHtml(payment.location)}</td>
+              <td>${D.escapeHtml(payment.username || "—")}</td>
+              <td>${D.escapeHtml(payment.officeSite || payment.location || "—")}</td>
               <td>${D.escapeHtml(payment.method)}</td>
-              <td>${payment.appliesToPlan ? '<span class="status-pill health-green compact">Yes</span>' : "-"}</td>
-              <td>${D.escapeHtml(payment.note || "-")}</td>
+              <td>${D.escapeHtml(payment.note || "—")}</td>
             </tr>`;
           }).join("")}</tbody>
         </table>
@@ -269,27 +274,25 @@
       <div class="detail-section">
         <h3>Payment Plan Performance</h3>
         <div class="details-summary plan-summary-cards">
-          <div class="mini-card"><span>Completed / verified</span><strong>${summary.completedCount} of ${summary.totalCount}</strong></div>
+          <div class="mini-card"><span>Completed</span><strong>${summary.completedCount} of ${summary.totalCount}</strong></div>
           <div class="mini-card"><span>Plan progress</span><strong>${summary.progressPercent.toFixed(1)}%</strong></div>
-          <div class="mini-card"><span>Ackerman on-time rate</span><strong>${onTime}</strong></div>
+          <div class="mini-card"><span>ACC on-time rate</span><strong>${onTime}</strong></div>
           <div class="mini-card"><span>UF checks due</span><strong>${summary.ufCheckDueCount}</strong></div>
         </div>
         <div class="history-wrap">
           <table class="history-table plan-history-table">
-            <thead><tr><th>Payment</th><th>Due date</th><th>Responsible</th><th>Scheduled</th><th>Paid / verified</th><th>Result</th></tr></thead>
+            <thead><tr><th>Payment</th><th>Due date</th><th>Assigned to</th><th>Assigned</th><th>Collected</th><th>Outstanding</th><th>Result</th></tr></thead>
             <tbody>${summary.installments.map((installment) => {
               const result = installment.status === "Paid" ? (installment.onTime ? "Paid on time" : "Paid late") : installment.status;
               const meta = D.statusMeta(installment.status === "Upcoming" ? "Upcoming Collection" : installment.status);
-              const paid = installment.responsibilityParty === "UF"
-                ? (installment.ufVerified ? "Verified" : "-")
-                : D.currency.format(installment.paidAmount);
               return `
                 <tr>
                   <td><strong>${installment.number}</strong></td>
                   <td>${D.formatDate(installment.dueDate)}</td>
-                  <td>${D.escapeHtml(installment.responsibilityParty)}</td>
+                  <td>${installment.responsibilityParty === "UF" ? "UF" : "ACC"}</td>
                   <td>${D.currency.format(installment.amount)}</td>
-                  <td>${D.escapeHtml(paid)}</td>
+                  <td>${D.currency.format(installment.paidAmount)}</td>
+                  <td>${D.currency.format(installment.remaining)}</td>
                   <td><span class="status-pill ${meta.pill} compact">${D.escapeHtml(result)}</span></td>
                 </tr>
               `;
@@ -307,12 +310,7 @@
     document.getElementById("completedDetailsTitle").textContent = patient.name;
     document.getElementById("completedDetailsSubtitle").textContent = `${patient.mrn} · Completed ${D.formatDate(patient.completedAt)}`;
     document.getElementById("completedDetailsBody").innerHTML = `
-      <div class="details-summary four-up">
-        <div class="mini-card"><span>Completed</span><strong>${D.formatDate(patient.completedAt)}</strong></div>
-        <div class="mini-card"><span>Net collected</span><strong>${D.currency.format(D.netCollected(patient))}</strong></div>
-        <div class="mini-card"><span>Adjustments</span><strong>${D.currency.format(D.adjustmentTotal(patient))}</strong></div>
-        <div class="mini-card"><span>Final balance</span><strong>${D.currency.format(D.amountOwed(patient))}</strong></div>
-      </div>
+      ${(() => { const f = D.financialBreakdown(patient); return `<div class="responsibility-summary-grid"><div class="responsibility-summary-card total"><h3>Total Patient Responsibility</h3><div><span>Total</span><strong>${D.currency.format(f.totalAssigned)}</strong></div><div><span>Collected</span><strong>${D.currency.format(f.totalCollected)}</strong></div><div><span>Outstanding</span><strong>${D.currency.format(f.totalOutstanding)}</strong></div></div><div class="responsibility-summary-card acc"><h3>ACC Assigned Patient Responsibility</h3><div><span>Assigned</span><strong>${D.currency.format(f.accAssigned)}</strong></div><div><span>Collected</span><strong>${D.currency.format(f.accCollected)}</strong></div><div><span>Outstanding</span><strong>${D.currency.format(f.accOutstanding)}</strong></div></div><div class="responsibility-summary-card uf"><h3>UF Assigned Patient Responsibility</h3><div><span>Assigned</span><strong>${D.currency.format(f.ufAssigned)}</strong></div><div><span>Collected</span><strong>${D.currency.format(f.ufCollected)}</strong></div><div><span>Outstanding</span><strong>${D.currency.format(f.ufOutstanding)}</strong></div></div></div>`; })()}
       <div class="completion-summary-callout ${D.amountOwed(patient) > D.EPSILON ? "has-balance" : ""}"><strong>${D.escapeHtml(patient.completionReason || "Completion reason not recorded")}</strong>${patient.completionNote ? ` · ${D.escapeHtml(patient.completionNote)}` : ""}</div>
       <div class="detail-section">
         <h3>Account Details</h3>
@@ -322,7 +320,7 @@
           ${patient.completionNote ? `<div class="detail-item"><span>Completion note</span><strong>${D.escapeHtml(patient.completionNote)}</strong></div>` : ""}
           <div class="detail-item"><span>Arrangement</span><strong>${D.escapeHtml(D.arrangementFromLegacy(patient))}</strong></div>
           <div class="detail-item"><span>Original collection date</span><strong>${D.formatDate(patient.collectionDate)}</strong></div>
-          <div class="detail-item"><span>Treatment type</span><strong>${D.escapeHtml(patient.treatment)}</strong></div>
+          <div class="detail-item"><span>Treatment flags</span><strong>${D.escapeHtml(D.treatmentLabel(patient))}</strong></div>
           <div class="detail-item"><span>Treatment site</span><strong>${D.escapeHtml(patient.location)}</strong></div>
           <div class="detail-item"><span>Insurance</span><strong>${D.escapeHtml(patient.insurance)}</strong></div>
           <div class="detail-item"><span>Status / action note</span><strong>${D.escapeHtml(patient.statusNote || "-")}</strong></div>
@@ -527,13 +525,16 @@
     }
 
     const headers = [
-      "Completion Date", "Completion Reason", "Completion Note", "Final Status", "Status Note", "Patient Name", "MRN", "Treatment Site", "Treatment Type", "Insurance",
-      "Responsibility", "Net Collected", "Adjustments", "Balance", "Days to Complete", "Had Payment Plan", "Plan Installments",
-      "Ackerman Overdue Payments", "UF Checks Due", "Plan On-Time Rate", "Account Created", "Last Updated",
+      "Completion Date", "Completion Reason", "Completion Note", "Final Status", "Status Note", "Patient Name", "MRN", "Treatment Site", "Treatment Flags", "Insurance",
+      "Total Patient Responsibility", "Collected Total Patient Responsibility", "Outstanding Total Patient Responsibility",
+      "ACC Assigned Patient Responsibility", "Collected ACC Assigned Patient Responsibility", "Outstanding ACC Assigned Patient Responsibility",
+      "UF Assigned Patient Responsibility", "Collected UF Assigned Patient Responsibility", "Outstanding UF Assigned Patient Responsibility",
+      "Adjustments", "Days to Complete", "Had Payment Plan", "Plan Installments", "ACC Overdue Payments", "UF Checks Due", "Plan On-Time Rate", "Account Created", "Last Updated",
       ...paymentHeaders
     ];
     const rows = visiblePatients.map((patient, patientIndex) => {
       const plan = D.planSummary(patient);
+      const financials = D.financialBreakdown(patient);
       const paymentCells = [];
       const payments = paymentHistories[patientIndex];
       for (let index = 0; index < maxPaymentCount; index += 1) {
@@ -545,8 +546,11 @@
         paymentCells.push(payment.date || "", D.transactionEffect(payment));
       }
       return [
-        patient.completedAt, patient.completionReason || "", patient.completionNote || "", D.effectiveStatus(patient), patient.statusNote || "", patient.name, patient.mrn, patient.location, patient.treatment,
-        patient.insurance, patient.responsibility, D.netCollected(patient), D.adjustmentTotal(patient), D.amountOwed(patient), D.daysBetween(patient.collectionDate, patient.completedAt),
+        patient.completedAt, patient.completionReason || "", patient.completionNote || "", D.effectiveStatus(patient), patient.statusNote || "", patient.name, patient.mrn, patient.location, D.treatmentLabel(patient), patient.insurance,
+        financials.totalAssigned, financials.totalCollected, financials.totalOutstanding,
+        financials.accAssigned, financials.accCollected, financials.accOutstanding,
+        financials.ufAssigned, financials.ufCollected, financials.ufOutstanding,
+        financials.adjustments, D.daysBetween(patient.collectionDate, patient.completedAt),
         plan ? "Yes" : "No", plan?.totalCount || 0, plan?.overdueCount || 0, plan?.ufCheckDueCount || 0,
         plan?.onTimeRate === null || !plan ? "" : plan.onTimeRate / 100, patient.createdAt || "", patient.updatedAt || "",
         ...paymentCells
@@ -554,7 +558,8 @@
     });
     const types = [
       "date", "text", "wrap", "text", "wrap", "text", "text", "text", "text", "text",
-      "currency", "currency", "currency", "currency", "integer", "text", "integer", "integer", "integer", "percent", "datetime", "datetime",
+      "currency", "currency", "currency", "currency", "currency", "currency", "currency", "currency", "currency", "currency",
+      "integer", "text", "integer", "integer", "integer", "percent", "datetime", "datetime",
       ...paymentTypes
     ];
     const now = new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short" }).format(new Date());
@@ -563,7 +568,7 @@
       sheetName: "Completed Patients",
       title: "Ackerman Patient Payment Board - Completed Patients",
       subtitle: `${rows.length} visible completed ${rows.length === 1 ? "record" : "records"} · Exported ${now}`,
-      headers, rows, types, statusColumn: 3, flagColumns: [18]
+      headers, rows, types, statusColumn: 3, flagColumns: [24]
     });
     showToast(`${rows.length} visible completed ${rows.length === 1 ? "record" : "records"} exported to Excel.`);
   });

@@ -9,12 +9,15 @@
   let sortState = { key: "actionDate", direction: "asc" };
   let detailsPatientId = null;
   let detailsFocus = "overview";
+  let paymentsPatientId = null;
+  let paymentsScheduleDraft = [];
   let editingPlanSchedule = [];
   let editingPlanPaidMap = new Map();
   let editingExistingPlan = false;
   let editingPatientId = "";
   let originalPlanSnapshot = "";
   let quickFilter = "";
+  const collapsedPatientIds = new Set();
 
   const elements = {
     tbody: document.getElementById("patientTableBody"),
@@ -26,6 +29,7 @@
     sort: document.getElementById("sortSelect"),
     resultCount: document.getElementById("resultCount"),
     patientDialog: document.getElementById("patientDialog"),
+    paymentsDialog: document.getElementById("paymentsDialog"),
     paymentDialog: document.getElementById("paymentDialog"),
     detailsDialog: document.getElementById("detailsDialog"),
     completionDialog: document.getElementById("completionDialog"),
@@ -38,7 +42,8 @@
     planTargetNote: document.getElementById("planTargetNote"),
     savedViewSelect: document.getElementById("savedViewSelect"),
     savedViewName: document.getElementById("savedViewName"),
-    toastRegion: document.getElementById("toastRegion")
+    toastRegion: document.getElementById("toastRegion"),
+    toggleAllRowsButton: document.getElementById("toggleAllRowsButton")
   };
 
   function findPatient(id) {
@@ -58,10 +63,10 @@
   }
 
   function populateFilters() {
-    const unique = (key) => [...new Set(patients.map((patient) => patient[key]).filter(Boolean))]
-      .sort((a, b) => a.localeCompare(b));
-    setSelectOptions(elements.locationFilter, unique("location"), "All sites");
-    setSelectOptions(elements.treatmentFilter, unique("treatment"), "All treatments");
+    const locations = [...new Set(patients.map((patient) => patient.location).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+    const treatments = [...new Set(patients.flatMap((patient) => D.patientTreatments(patient)))].sort((a, b) => a.localeCompare(b));
+    setSelectOptions(elements.locationFilter, locations, "All sites");
+    setSelectOptions(elements.treatmentFilter, treatments, "All treatments");
   }
 
   function showToast(message, type = "success") {
@@ -141,6 +146,7 @@
     if (key === "collected") return D.netCollected(patient);
     if (key === "planProgress") return D.planSummary(patient)?.progressPercent ?? 101;
     if (key === "ufCheckAge") return D.planSummary(patient)?.oldestUfCheckDays ?? -1;
+    if (key === "treatment") return D.treatmentLabel(patient).toLowerCase();
     return String(patient[key] || "").toLowerCase();
   }
 
@@ -188,13 +194,13 @@
     return patients
       .filter((patient) => {
         if (patient.archived) return false;
-        const searchable = [patient.name, patient.mrn, patient.location, patient.treatment, patient.insurance, patient.statusNote]
+        const searchable = [patient.name, patient.mrn, patient.location, D.treatmentLabel(patient), patient.insurance, patient.statusNote]
           .join(" ").toLowerCase();
         return (!query || searchable.includes(query))
           && matchesStatusFilter(patient, elements.statusFilter.value)
           && matchesQuickFilter(patient)
           && (elements.locationFilter.value === "all" || patient.location === elements.locationFilter.value)
-          && (elements.treatmentFilter.value === "all" || patient.treatment === elements.treatmentFilter.value);
+          && (elements.treatmentFilter.value === "all" || D.patientTreatments(patient).includes(elements.treatmentFilter.value));
       })
       .sort(comparePatients);
   }
@@ -244,9 +250,8 @@
 
   function actionButtons(patient) {
     const id = D.escapeHtml(patient.id);
-    const canPay = collectableAmount(patient) > D.EPSILON;
     return [
-      `<button class="btn btn-primary board-action-btn" data-action="payment" data-id="${id}" type="button"${canPay ? "" : ' disabled title="No Ackerman balance to collect"'}>Pay</button>`,
+      `<button class="btn btn-primary board-action-btn" data-action="payments" data-id="${id}" type="button">Payments</button>`,
       `<button class="btn btn-documents board-action-btn" data-action="documents" data-id="${id}" type="button">Docs<span class="doc-count" data-doc-count-for="${id}" hidden></span></button>`,
       `<button class="btn btn-ghost board-action-btn" data-action="details" data-id="${id}" type="button">View Details</button>`,
       `<button class="btn btn-success board-action-btn" data-action="complete" data-id="${id}" type="button">Complete</button>`
@@ -256,10 +261,10 @@
   function planProgressHtml(patient) {
     const plan = D.planSummary(patient);
     if (!plan) return "";
-    const onTimeText = plan.onTimeRate === null ? "No Ackerman installments due yet" : `${plan.onTimeRate.toFixed(0)}% paid by due date`;
+    const onTimeText = plan.onTimeRate === null ? "No ACC installments due yet" : `${plan.onTimeRate.toFixed(0)}% paid by due date`;
     return `
       <div class="plan-progress-block">
-        <div class="plan-progress-label"><span>${plan.completedCount} of ${plan.totalCount} payments complete / verified</span><strong>${plan.progressPercent.toFixed(0)}%</strong></div>
+        <div class="plan-progress-label"><span>${plan.completedCount} of ${plan.totalCount} payments complete</span><strong>${plan.progressPercent.toFixed(0)}%</strong></div>
         <div class="progress-track"><div class="progress-fill health-progress" style="width:${Math.min(100, plan.progressPercent).toFixed(2)}%"></div></div>
         <div class="plan-progress-amounts"><span>${D.currency.format(plan.totalOwed)} still outstanding</span><strong>${plan.remainingPercent.toFixed(0)}% remaining</strong></div>
         <div class="plan-progress-subtext">${D.escapeHtml(onTimeText)}${plan.ufCheckDueCount ? ` · ⚑ ${plan.ufCheckDueCount} UF check${plan.ufCheckDueCount === 1 ? "" : "s"} due` : ""}</div>
@@ -267,26 +272,67 @@
     `;
   }
 
-  function financialPlanHtml(patient, collected, adjustments) {
-    const plan = planForPatient(patient);
-    if (!plan) {
-      return `
-        <div class="financial-stack">
-          <div class="financial-line"><span>Responsibility</span><strong>${D.currency.format(patient.responsibility)}</strong></div>
-          <div class="financial-line"><span>Collected</span><strong>${D.currency.format(collected)}</strong></div>
-          ${adjustments > D.EPSILON ? `<div class="financial-line"><span>Adjustments</span><strong>${D.currency.format(adjustments)}</strong></div>` : ""}
-          <div class="financial-line balance"><span>Still owed</span><strong>${D.currency.format(D.amountOwed(patient))}</strong></div>
-        </div>`;
-    }
+  function financialPlanHtml(patient) {
+    const f = D.financialBreakdown(patient);
+    const signed = (value) => D.currency.format(value);
     return `
-      <div class="financial-stack plan-financial-stack">
-        <div class="financial-line"><span>Total responsible</span><strong>${D.currency.format(patient.responsibility)}</strong></div>
-        <div class="financial-line"><span>Ackerman owes</span><strong>${D.currency.format(plan.ackermanOwed)}</strong></div>
-        <div class="financial-line"><span>UF owes</span><strong>${D.currency.format(plan.ufOwed)}</strong></div>
-        <div class="financial-line balance"><span>Total outstanding</span><strong>${D.currency.format(plan.totalOwed)}</strong></div>
-        <div class="financial-line"><span>Still remaining</span><strong>${plan.remainingPercent.toFixed(1)}%</strong></div>
-        <div class="financial-line"><span>Ackerman collected</span><strong>${D.currency.format(collected)}</strong></div>
+      <div class="financial-stack responsibility-financial-stack">
+        <div class="financial-group">
+          <div class="financial-group-title">Total Patient Responsibility</div>
+          <div class="financial-line"><span>Total</span><strong>${signed(f.totalAssigned)}</strong></div>
+          <div class="financial-line"><span>Collected</span><strong>${signed(f.totalCollected)}</strong></div>
+          <div class="financial-line balance"><span>Outstanding</span><strong>${signed(f.totalOutstanding)}</strong></div>
+        </div>
+        <div class="financial-group">
+          <div class="financial-group-title">ACC Assigned Patient Responsibility</div>
+          <div class="financial-line"><span>Assigned</span><strong>${signed(f.accAssigned)}</strong></div>
+          <div class="financial-line"><span>Collected</span><strong>${signed(f.accCollected)}</strong></div>
+          <div class="financial-line balance"><span>Outstanding</span><strong>${signed(f.accOutstanding)}</strong></div>
+        </div>
+        <div class="financial-group">
+          <div class="financial-group-title">UF Assigned Patient Responsibility</div>
+          <div class="financial-line"><span>Assigned</span><strong>${signed(f.ufAssigned)}</strong></div>
+          <div class="financial-line"><span>Collected</span><strong>${signed(f.ufCollected)}</strong></div>
+          <div class="financial-line balance"><span>Outstanding</span><strong>${signed(f.ufOutstanding)}</strong></div>
+        </div>
+        ${f.adjustments > D.EPSILON ? `<div class="financial-line financial-adjustment-note"><span>Adjustments</span><strong>${signed(f.adjustments)}</strong></div>` : ""}
       </div>`;
+  }
+
+  function compactFinancialSummaryHtml(patient) {
+    const f = D.financialBreakdown(patient);
+    const plan = planForPatient(patient);
+    const status = frontPageStatus(patient);
+    let label = "Outstanding";
+    let amount = f.totalOutstanding;
+
+    if (status === "Overdue" && plan) {
+      label = "Past due";
+      amount = plan.overdueAmount || 0;
+    } else if (status === "Due Today" && plan) {
+      label = "Due today";
+      amount = plan.dueTodayAmount || 0;
+    } else if (plan?.nextDue) {
+      label = "Next payment";
+      amount = plan.nextDue.amountDue || 0;
+    }
+
+    return `
+      <div class="collapsed-financial-summary" aria-label="Compact financial summary">
+        <div class="collapsed-financial-primary"><span>${D.escapeHtml(label)}</span><strong>${D.currency.format(amount)}</strong></div>
+        <div class="collapsed-financial-secondary">Outstanding ${D.currency.format(f.totalOutstanding)}</div>
+      </div>
+    `;
+  }
+
+  function updateCollapseAllButton(rows) {
+    if (!elements.toggleAllRowsButton) return;
+    const visibleIds = rows.map((patient) => patient.id);
+    const allCollapsed = visibleIds.length > 0 && visibleIds.every((id) => collapsedPatientIds.has(id));
+    elements.toggleAllRowsButton.disabled = visibleIds.length === 0;
+    elements.toggleAllRowsButton.textContent = allCollapsed ? "▸ Expand All" : "▾ Collapse All";
+    elements.toggleAllRowsButton.setAttribute("aria-expanded", allCollapsed ? "false" : "true");
+    elements.toggleAllRowsButton.title = allCollapsed ? "Expand all visible patient rows" : "Collapse all visible patient rows";
   }
 
   function dueCellHtml(patient) {
@@ -296,7 +342,7 @@
       return `
         <div class="date-kicker">Payment ${plan.nextDue.number} of ${plan.totalCount} · ${D.escapeHtml(plan.nextDue.responsibilityParty)}</div>
         <div class="date-main">${D.formatDate(plan.nextDue.dueDate)}</div>
-        <div class="date-relative">${D.escapeHtml(dateRelativeText(plan.nextDue.dueDate))} · ${D.currency.format(plan.nextDue.remaining)}</div>
+        <div class="date-relative">${D.escapeHtml(dateRelativeText(plan.nextDue.dueDate))} · ${D.currency.format(plan.nextDue.amountDue)}</div>
       `;
     }
     return `<div class="date-main">${D.formatDate(patient.collectionDate)}</div><div class="date-relative">${D.escapeHtml(dateRelativeText(patient.collectionDate))}</div>`;
@@ -312,18 +358,24 @@
       const status = D.effectiveStatus(patient);
       const health = D.patientHealth(patient);
       const owed = D.amountOwed(patient);
-      const collected = D.netCollected(patient);
-      const adjustments = D.adjustmentTotal(patient);
       const tr = document.createElement("tr");
-      tr.className = health.row;
+      const isCollapsed = collapsedPatientIds.has(patient.id);
+      tr.className = `${health.row} patient-row${isCollapsed ? " is-collapsed" : ""}`;
+      tr.dataset.patientId = patient.id;
       tr.innerHTML = `
         <td data-label="Status">${statusPillsHtml(patient, true)}<input class="status-note-input" data-status-note-id="${D.escapeHtml(patient.id)}" maxlength="120" value="${D.escapeHtml(patient.statusNote || "")}" placeholder="Quick note (e.g. Call patient)" aria-label="Quick status note for ${D.escapeHtml(patient.name)}"></td>
-        <td data-label="Patient"><button class="patient-link" type="button" data-action="details" data-id="${D.escapeHtml(patient.id)}">${D.escapeHtml(patient.name)}</button><div class="mrn">${D.escapeHtml(patient.mrn)}</div><div class="cell-tertiary">Updated ${D.escapeHtml(D.formatDateTime(patient.updatedAt || patient.createdAt))}</div></td>
-        <td data-label="Treatment"><div class="cell-primary">${D.escapeHtml(patient.treatment)}</div></td>
+        <td data-label="Patient">
+          <div class="patient-cell-heading">
+            <button class="row-collapse-toggle" type="button" data-action="toggle-row" data-id="${D.escapeHtml(patient.id)}" aria-expanded="${isCollapsed ? "false" : "true"}" aria-label="${isCollapsed ? "Expand" : "Collapse"} ${D.escapeHtml(patient.name)}" title="${isCollapsed ? "Expand patient row" : "Collapse patient row"}">${isCollapsed ? "▸" : "▾"}</button>
+            <button class="patient-link" type="button" data-action="details" data-id="${D.escapeHtml(patient.id)}">${D.escapeHtml(patient.name)}</button>
+          </div>
+          <div class="mrn">${D.escapeHtml(patient.mrn)}</div><div class="cell-tertiary">Updated ${D.escapeHtml(D.formatDateTime(patient.updatedAt || patient.createdAt))}</div>
+        </td>
+        <td data-label="Treatment"><div class="treatment-badges">${D.patientTreatments(patient).map((treatment) => `<span class="treatment-badge">${D.escapeHtml(treatment)}</span>`).join("")}</div></td>
         <td data-label="Site & Insurance"><div class="cell-primary">${D.escapeHtml(patient.location)}</div><div class="cell-secondary">${D.escapeHtml(patient.insurance)}</div></td>
         <td data-label="Financials / Plan">
-          ${financialPlanHtml(patient, collected, adjustments)}
-          ${planProgressHtml(patient)}
+          <div class="expanded-financial-content">${financialPlanHtml(patient)}${planProgressHtml(patient)}</div>
+          ${compactFinancialSummaryHtml(patient)}
         </td>
         <td data-label="Next Due">${dueCellHtml(patient)}</td>
         <td class="actions-cell" data-label="Actions"><div class="actions">${actionButtons(patient)}</div></td>
@@ -331,6 +383,7 @@
       elements.tbody.appendChild(tr);
     });
 
+    updateCollapseAllButton(rows);
     const quickText = quickFilter ? ` · quick filter: ${quickFilter}` : "";
     elements.resultCount.textContent = `${rows.length} ${rows.length === 1 ? "record" : "records"}${quickText}`;
     updateDocumentCounts(rows);
@@ -406,7 +459,7 @@
     const oldestUfDays = ops.ufChecks.reduce((max, patient) => Math.max(max, D.planSummary(patient)?.oldestUfCheckDays || 0), 0);
     document.getElementById("opsUfChecksContext").textContent = oldestUfDays > 0
       ? `Oldest UF check is ${oldestUfDays} day${oldestUfDays === 1 ? "" : "s"} past due`
-      : "UF-responsible payments whose due date has passed";
+      : "UF-assigned payments past due with no UF payment recorded";
 
     document.querySelectorAll("[data-quick-filter]").forEach((button) => {
       button.classList.toggle("active", button.dataset.quickFilter === quickFilter);
@@ -480,18 +533,15 @@
 
   function readPlanScheduleFromDom() {
     return [...elements.planScheduleBody.querySelectorAll("tr")].map((row, index) => {
-      const selectedParty = row.querySelector("input[data-plan-field='responsibilityParty']:checked")?.value || "";
-      const ufVerifiedInput = row.querySelector("input[data-plan-field='ufVerified']");
-      const priorVerifiedAt = row.dataset.ufVerifiedAt || "";
-      const ufVerified = selectedParty === "UF" && Boolean(ufVerifiedInput?.checked);
+      const selectedParty = row.querySelector("input[data-plan-field='responsibilityParty']:checked")?.value || "Ackerman";
       return {
         id: row.dataset.installmentId || D.uid(`installment-${index + 1}`),
         dueDate: row.querySelector("input[data-plan-field='dueDate']")?.value || "",
         originalDueDate: row.dataset.originalDueDate || row.querySelector("input[data-plan-field='dueDate']")?.value || "",
         amount: Number(row.querySelector("input[data-plan-field='amount']")?.value || 0),
         responsibilityParty: selectedParty === "UF" ? "UF" : "Ackerman",
-        ufVerified,
-        ufVerifiedAt: ufVerified ? (priorVerifiedAt || D.todayIso()) : "",
+        ufVerified: false,
+        ufVerifiedAt: "",
         rescheduledAt: row.dataset.rescheduledAt || ""
       };
     });
@@ -503,17 +553,9 @@
         id: item.id,
         dueDate: item.dueDate,
         amount: Number(item.amount || 0).toFixed(2),
-        responsibilityParty: item.responsibilityParty === "UF" ? "UF" : "Ackerman",
-        ufVerified: Boolean(item.ufVerified)
+        responsibilityParty: item.responsibilityParty === "UF" ? "UF" : "Ackerman"
       }))
     });
-  }
-
-  function ufCheckIsDue(installment) {
-    return installment.responsibilityParty === "UF"
-      && !installment.ufVerified
-      && Boolean(installment.dueDate)
-      && installment.dueDate < D.todayIso();
   }
 
   function renderPlanEditor() {
@@ -523,13 +565,10 @@
     editingPlanSchedule.forEach((installment, index) => {
       const paid = editingPlanPaidMap.get(installment.id) || 0;
       const party = installment.responsibilityParty === "UF" ? "UF" : "Ackerman";
-      const ufVerified = party === "UF" && Boolean(installment.ufVerified);
-      const ufCheckDue = ufCheckIsDue({ ...installment, responsibilityParty: party, ufVerified });
       const row = document.createElement("tr");
       row.dataset.installmentId = installment.id;
       row.dataset.originalDueDate = installment.originalDueDate || installment.dueDate;
       row.dataset.rescheduledAt = installment.rescheduledAt || "";
-      row.dataset.ufVerifiedAt = installment.ufVerifiedAt || "";
       row.innerHTML = `
         <td><strong>Payment ${index + 1}</strong></td>
         <td><input type="date" data-plan-field="dueDate" value="${D.escapeHtml(installment.dueDate)}" aria-label="Payment ${index + 1} due date"></td>
@@ -537,14 +576,9 @@
         <td><div class="installment-editor-progress"><strong>${D.currency.format(paid)}</strong><span>recorded</span></div></td>
         <td>
           <div class="responsibility-choice" role="group" aria-label="Payment ${index + 1} responsibility">
-            <label class="responsibility-option"><input type="radio" name="responsibility-${index}" data-plan-field="responsibilityParty" value="Ackerman" ${party === "Ackerman" ? "checked" : ""}> <span>Ackerman responsible</span></label>
+            <label class="responsibility-option"><input type="radio" name="responsibility-${index}" data-plan-field="responsibilityParty" value="Ackerman" ${party === "Ackerman" ? "checked" : ""}> <span>ACC responsible</span></label>
             <label class="responsibility-option"><input type="radio" name="responsibility-${index}" data-plan-field="responsibilityParty" value="UF" ${party === "UF" ? "checked" : ""}> <span>UF responsible</span></label>
           </div>
-          <label class="uf-verify-control" ${party === "UF" ? "" : "hidden"}>
-            <input type="checkbox" data-plan-field="ufVerified" ${ufVerified ? "checked" : ""}>
-            <span>UF payment checked / went through</span>
-          </label>
-          <div class="uf-check-flag" ${ufCheckDue ? "" : "hidden"}>⚑ Check UF — ${ufCheckDue ? `${Math.max(1, D.daysBetween(installment.dueDate, D.todayIso()))} day${Math.max(1, D.daysBetween(installment.dueDate, D.todayIso())) === 1 ? "" : "s"} past due` : "due date has passed"}</div>
         </td>
       `;
       elements.planScheduleBody.appendChild(row);
@@ -562,7 +596,7 @@
     const ufCount = editingPlanSchedule.filter((item) => item.responsibilityParty === "UF").length;
     elements.planTargetNote.textContent = `Reference target: ${D.currency.format(target)} · Collected before plan: ${D.currency.format(opening)} · Manual schedule total: ${D.currency.format(total)}`;
     elements.planScheduleSummary.className = "plan-total-row manual";
-    elements.planScheduleSummary.innerHTML = `<span>${editingPlanSchedule.length} payments · ${ackermanCount} Ackerman · ${ufCount} UF</span><span>Difference from reference target: <strong>${D.currency.format(difference)}</strong></span><span>Informational only — manual schedules can still be saved.</span>`;
+    elements.planScheduleSummary.innerHTML = `<span>${editingPlanSchedule.length} payments · ${ackermanCount} ACC · ${ufCount} UF</span><span>Difference from reference target: <strong>${D.currency.format(difference)}</strong></span><span>Informational only — manual schedules can still be saved.</span>`;
   }
 
   function buildPlanSchedule() {
@@ -609,12 +643,11 @@
     document.getElementById("patientName").value = patient?.name || "";
     document.getElementById("patientMrn").value = patient?.mrn || "";
     document.getElementById("patientLocation").value = patient?.location || "Jacksonville";
-    document.getElementById("patientTreatment").value = D.normalizeTreatmentType(patient?.treatment || "Proton");
+    const selectedTreatments = new Set(patient ? D.patientTreatments(patient) : ["Proton"]);
+    document.querySelectorAll('input[name="patientTreatmentFlag"]').forEach((checkbox) => { checkbox.checked = selectedTreatments.has(checkbox.value); });
     document.getElementById("patientInsurance").value = patient?.insurance || "";
     document.getElementById("patientResponsibility").value = patient?.responsibility ?? "";
-    document.getElementById("patientCollected").value = patient ? D.netCollected(patient) : 0;
-    document.getElementById("patientCollected").disabled = isEditing;
-    document.getElementById("collectedHint").textContent = isEditing ? "Use Pay or the financial ledger to change collected dollars." : "Optional opening payment. Later changes use Pay.";
+    document.getElementById("patientCollected").value = "0";
     document.getElementById("patientDate").value = patient?.collectionDate || D.todayIso();
     document.getElementById("patientArrangement").value = patient ? D.arrangementFromLegacy(patient) : "Payment Plan";
     document.getElementById("patientStatusNote").value = patient?.statusNote || "";
@@ -623,9 +656,9 @@
 
     editingExistingPlan = Boolean(patient?.paymentPlan);
     const planSummary = patient?.paymentPlan ? D.planSummary(patient) : null;
-    editingPlanPaidMap = new Map((planSummary?.installments || []).map((installment) => [installment.id, installment.responsibilityParty === "Ackerman" ? installment.paidAmount : 0]));
+    editingPlanPaidMap = new Map((planSummary?.installments || []).map((installment) => [installment.id, installment.paidAmount]));
     editingPlanSchedule = patient?.paymentPlan?.installments ? D.deepCopy(patient.paymentPlan.installments) : [];
-    document.getElementById("planOpeningCollected").value = String(patient?.paymentPlan?.openingCollected ?? (patient ? D.netCollected(patient) : 0));
+    document.getElementById("planOpeningCollected").value = "0";
     document.getElementById("planInstallmentCount").value = String(editingPlanSchedule.length || 1);
     document.getElementById("planFirstDueDate").value = editingPlanSchedule[0]?.dueDate || patient?.collectionDate || D.todayIso();
     document.getElementById("planFrequency").value = "monthly";
@@ -638,29 +671,131 @@
   }
 
   // Payment, adjustment, and transaction dialogs ------------------
-  function openPaymentDialog(patient) {
-    const balance = collectableAmount(patient);
+  // Payment, adjustment, and transaction dialogs ------------------
+  function defaultOfficeSite(patient) {
+    const map = {
+      "Jacksonville": "ACC Mandarin",
+      "Amelia Island": "ACC Amelia Island",
+      "St. Augustine": "ACC St. Augustine",
+      "Urology World Golf Village": "Urology World Golf Village",
+      "Urology Middleburg": "Urology Middleburg"
+    };
+    return map[patient.location] || "ACC Mandarin";
+  }
+
+  function paymentsScheduleSnapshot(schedule = paymentsScheduleDraft) {
+    return JSON.stringify((schedule || []).map((item) => ({
+      id: item.id, dueDate: item.dueDate, amount: Number(item.amount || 0).toFixed(2),
+      responsibilityParty: item.responsibilityParty === "UF" ? "UF" : "Ackerman"
+    })));
+  }
+
+  function readPaymentsScheduleDraft() {
+    const body = document.getElementById("paymentsScheduleBody");
+    if (!body) return [];
+    return [...body.querySelectorAll("tr[data-installment-id]")].map((row) => ({
+      id: row.dataset.installmentId,
+      dueDate: row.querySelector("input[data-workspace-field='dueDate']")?.value || "",
+      originalDueDate: row.dataset.originalDueDate || row.querySelector("input[data-workspace-field='dueDate']")?.value || "",
+      amount: Number(row.querySelector("input[data-workspace-field='amount']")?.value || 0),
+      responsibilityParty: row.querySelector("select[data-workspace-field='party']")?.value === "UF" ? "UF" : "Ackerman",
+      ufVerified: false, ufVerifiedAt: "", rescheduledAt: row.dataset.rescheduledAt || "",
+      isNew: row.dataset.isNew === "true"
+    }));
+  }
+
+  function paymentsFinancialSummaryHtml(patient) {
+    const f = D.financialBreakdown(patient);
+    return `
+      <div class="responsibility-summary-grid">
+        <div class="responsibility-summary-card total"><h3>Total Patient Responsibility</h3><div><span>Total</span><strong>${D.currency.format(f.totalAssigned)}</strong></div><div><span>Collected</span><strong>${D.currency.format(f.totalCollected)}</strong></div><div><span>Outstanding</span><strong>${D.currency.format(f.totalOutstanding)}</strong></div></div>
+        <div class="responsibility-summary-card acc"><h3>ACC Assigned Patient Responsibility</h3><div><span>Assigned</span><strong>${D.currency.format(f.accAssigned)}</strong></div><div><span>Collected</span><strong>${D.currency.format(f.accCollected)}</strong></div><div><span>Outstanding</span><strong>${D.currency.format(f.accOutstanding)}</strong></div></div>
+        <div class="responsibility-summary-card uf"><h3>UF Assigned Patient Responsibility</h3><div><span>Assigned</span><strong>${D.currency.format(f.ufAssigned)}</strong></div><div><span>Collected</span><strong>${D.currency.format(f.ufCollected)}</strong></div><div><span>Outstanding</span><strong>${D.currency.format(f.ufOutstanding)}</strong></div></div>
+      </div>`;
+  }
+
+  function renderPaymentsWorkspace(patient) {
+    const savedSummary = D.planSummary(patient);
+    const savedById = new Map((savedSummary?.installments || []).map((item) => [item.id, item]));
+    document.getElementById("paymentsFinancialSummary").innerHTML = paymentsFinancialSummaryHtml(patient);
+    const body = document.getElementById("paymentsScheduleBody");
+    body.innerHTML = "";
+
+    paymentsScheduleDraft.forEach((installment, index) => {
+      const saved = savedById.get(installment.id);
+      const party = installment.responsibilityParty === "UF" ? "UF" : "Ackerman";
+      const collected = saved?.paidAmount || 0;
+      const outstanding = Number(installment.amount || 0) - collected;
+      const status = saved?.status || (installment.isNew ? "New — save schedule" : "Scheduled");
+      const row = document.createElement("tr");
+      row.dataset.installmentId = installment.id;
+      row.dataset.originalDueDate = installment.originalDueDate || installment.dueDate || "";
+      row.dataset.rescheduledAt = installment.rescheduledAt || "";
+      row.dataset.isNew = installment.isNew ? "true" : "false";
+      row.innerHTML = `
+        <td><strong>${index + 1}</strong></td>
+        <td><input type="date" data-workspace-field="dueDate" value="${D.escapeHtml(installment.dueDate || "")}" aria-label="Payment ${index + 1} due date"></td>
+        <td><div class="money-input"><span>$</span><input type="number" min="0.01" step="0.01" data-workspace-field="amount" value="${Number(installment.amount || 0).toFixed(2)}" aria-label="Payment ${index + 1} assigned amount"></div></td>
+        <td><select data-workspace-field="party" aria-label="Payment ${index + 1} assigned party"><option value="Ackerman" ${party === "Ackerman" ? "selected" : ""}>ACC</option><option value="UF" ${party === "UF" ? "selected" : ""}>UF</option></select></td>
+        <td><strong>${D.currency.format(collected)}</strong></td>
+        <td><strong>${D.currency.format(outstanding)}</strong></td>
+        <td>${installment.isNew ? '<span class="status-pill health-green compact">Save first</span>' : `<span class="status-pill ${saved?.ufCheckDue ? "uf-flag" : (saved?.status === "Overdue" ? "health-yellow" : "health-green")} compact">${D.escapeHtml(status)}</span>${saved?.ufCheckDue ? `<div class="uf-check-inline-flag">⚑ ${saved.daysLate} day${saved.daysLate === 1 ? "" : "s"} past due</div>` : ""}`}</td>
+        <td><div class="schedule-row-actions"><button class="btn btn-primary btn-small" type="button" data-payments-action="record" data-installment-id="${D.escapeHtml(installment.id)}" ${installment.isNew ? "disabled" : ""}>Record Payment</button><button class="btn btn-ghost btn-small" type="button" data-payments-action="remove" data-installment-id="${D.escapeHtml(installment.id)}">Remove</button></div></td>
+      `;
+      body.appendChild(row);
+    });
+
+    const total = paymentsScheduleDraft.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+    const acc = paymentsScheduleDraft.filter((item) => item.responsibilityParty !== "UF").reduce((sum, item) => sum + Number(item.amount || 0), 0);
+    const uf = paymentsScheduleDraft.filter((item) => item.responsibilityParty === "UF").reduce((sum, item) => sum + Number(item.amount || 0), 0);
+    const delta = Math.round((total - Number(patient.responsibility || 0)) * 100) / 100;
+    document.getElementById("paymentsScheduleSummary").innerHTML = `<span>${paymentsScheduleDraft.length} scheduled payment${paymentsScheduleDraft.length === 1 ? "" : "s"} · ACC ${D.currency.format(acc)} · UF ${D.currency.format(uf)}</span><span>Schedule total: <strong>${D.currency.format(total)}</strong> · Difference from Total Patient Responsibility: <strong>${D.currency.format(delta)}</strong></span><span>Changing the schedule does not change Total Patient Responsibility.</span>`;
+    document.getElementById("paymentsLedger").innerHTML = paymentHistoryHtml(patient, true);
+  }
+
+  function refreshPaymentsScheduleSummary(patient) {
+    const total = paymentsScheduleDraft.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+    const acc = paymentsScheduleDraft.filter((item) => item.responsibilityParty !== "UF").reduce((sum, item) => sum + Number(item.amount || 0), 0);
+    const uf = paymentsScheduleDraft.filter((item) => item.responsibilityParty === "UF").reduce((sum, item) => sum + Number(item.amount || 0), 0);
+    const delta = Math.round((total - Number(patient.responsibility || 0)) * 100) / 100;
+    document.getElementById("paymentsScheduleSummary").innerHTML = `<span>${paymentsScheduleDraft.length} scheduled payment${paymentsScheduleDraft.length === 1 ? "" : "s"} · ACC ${D.currency.format(acc)} · UF ${D.currency.format(uf)}</span><span>Schedule total: <strong>${D.currency.format(total)}</strong> · Difference from Total Patient Responsibility: <strong>${D.currency.format(delta)}</strong></span><span>Changing the schedule does not change Total Patient Responsibility.</span>`;
+  }
+
+  function openPaymentsDialog(patient) {
+    paymentsPatientId = patient.id;
+    document.getElementById("paymentsTitle").textContent = `Payments — ${patient.name}`;
+    document.getElementById("paymentsSubtitle").textContent = `${patient.mrn} · Edit the schedule or record an ACC / UF payment.`;
+    paymentsScheduleDraft = patient.paymentPlan?.installments ? D.deepCopy(patient.paymentPlan.installments).map((item) => ({ ...item, isNew: false })) : [];
+    renderPaymentsWorkspace(patient);
+    const noResponsibility = D.arrangementFromLegacy(patient) === "No Responsibility";
+    document.getElementById("addScheduledPaymentButton").disabled = noResponsibility;
+    document.getElementById("savePaymentScheduleButton").disabled = noResponsibility;
+    document.getElementById("paymentsAdjustmentButton").disabled = noResponsibility;
+    if (!elements.paymentsDialog.open) elements.paymentsDialog.showModal();
+  }
+
+  function openPaymentDialog(patient, installmentId) {
+    const summary = D.planSummary(patient);
+    const installment = summary?.installments.find((item) => item.id === installmentId);
+    if (!installment) return showToast("Save the schedule before recording a payment.", "error");
+
     document.getElementById("paymentPatientId").value = patient.id;
+    document.getElementById("paymentInstallmentId").value = installment.id;
+    document.getElementById("paymentResponsibilityParty").value = installment.responsibilityParty;
     document.getElementById("paymentPatientName").textContent = patient.name;
     document.getElementById("paymentPatientMrn").textContent = patient.mrn;
-    document.getElementById("paymentBalance").textContent = D.currency.format(balance);
-    document.getElementById("paymentAmount").value = "";
-    document.getElementById("paymentAmount").max = String(balance);
+    document.getElementById("paymentAssignedParty").textContent = installment.responsibilityParty === "UF" ? "UF" : "ACC";
+    document.getElementById("paymentScheduledAmount").textContent = D.currency.format(installment.amount);
+    document.getElementById("paymentAlreadyCollected").textContent = D.currency.format(installment.paidAmount);
+    document.getElementById("paymentBalance").textContent = D.currency.format(installment.amountDue);
+    document.getElementById("paymentAmount").value = installment.amountDue > D.EPSILON ? installment.amountDue.toFixed(2) : "";
     document.getElementById("paymentDate").value = D.todayIso();
-    document.getElementById("paymentLocation").value = patient.location;
+    document.getElementById("paymentUsername").value = "";
+    document.getElementById("paymentOfficeSite").value = defaultOfficeSite(patient);
     document.getElementById("paymentMethod").value = "Credit/Debit Card";
     document.getElementById("paymentNote").value = "";
-
-    const context = document.getElementById("paymentPlanContext");
-    const plan = D.effectiveStatus(patient) === "Payment Plan" ? D.planSummary(patient) : null;
-    if (plan?.nextAckermanDue) {
-      context.hidden = false;
-      context.innerHTML = `<span class="status-pill health-green">Payment Plan</span><div><strong>Next Ackerman-responsible payment:</strong> Payment ${plan.nextAckermanDue.number} of ${plan.totalCount}, ${D.currency.format(plan.nextAckermanDue.remaining)} due ${D.formatDate(plan.nextAckermanDue.dueDate)} (${D.escapeHtml(dateRelativeText(plan.nextAckermanDue.dueDate))}).</div>`;
-      document.getElementById("paymentAmount").value = Math.min(balance, plan.nextAckermanDue.remaining).toFixed(2);
-    } else {
-      context.hidden = true;
-      context.innerHTML = "";
-    }
+    document.getElementById("paymentPlanContext").innerHTML = `<div><strong>Scheduled payment ${installment.number} of ${summary.totalCount}</strong> · ${D.currency.format(installment.amount)} due ${D.formatDate(installment.dueDate)} · ${installment.responsibilityParty === "UF" ? "UF" : "ACC"} assigned.</div><div class="field-hint">Recording a different amount updates Collected totals only. It does not rewrite the assigned schedule.</div>`;
+    if (elements.paymentsDialog.open) elements.paymentsDialog.close();
     elements.paymentDialog.showModal();
     document.getElementById("paymentAmount").focus();
   }
@@ -708,18 +843,26 @@
   }
 
   // Details and timeline ----------------------------------------------------
-  function paymentHistoryHtml(patient) {
+  function paymentHistoryHtml(patient, editable = false) {
     const payments = D.normalizedPayments(patient).sort((a, b) => `${b.date}|${b.createdAt}`.localeCompare(`${a.date}|${a.createdAt}`));
     if (!payments.length) return '<div class="notes-box">No payment transactions have been recorded.</div>';
-    return `<div class="history-wrap"><table class="history-table"><thead><tr><th>Date</th><th>Type</th><th>Amount</th><th>Site</th><th>Method</th><th>Note</th><th></th></tr></thead><tbody>${payments.map((payment) => {
+    const plan = D.planSummary(patient);
+    const installmentNumbers = new Map((plan?.installments || []).map((item) => [item.id, item.number]));
+    return `<div class="history-wrap"><table class="history-table payment-ledger-table"><thead><tr><th>Date</th><th>Type</th><th>Assigned</th><th>Scheduled Payment</th><th>Amount</th><th>Username</th><th>Office Site</th><th>Method</th><th>Note</th>${editable ? "<th>Action</th>" : ""}</tr></thead><tbody>${payments.map((payment) => {
       const effect = D.transactionEffect(payment);
       const reversible = effect > 0 ? D.reversibleAmount(patient, payment.id) : 0;
+      const scheduledNumber = payment.installmentId ? installmentNumbers.get(payment.installmentId) : null;
       return `<tr>
         <td>${D.formatDate(payment.date)}</td>
         <td><span class="ledger-type ${effect < 0 ? "negative" : "positive"}">${D.escapeHtml(payment.type)}</span></td>
+        <td><strong>${payment.responsibilityParty === "UF" ? "UF" : "ACC"}</strong></td>
+        <td>${scheduledNumber ? `Payment ${scheduledNumber}` : "—"}</td>
         <td><strong class="${effect < 0 ? "negative-money" : ""}">${effect < 0 ? "−" : ""}${D.currency.format(payment.amount)}</strong></td>
-        <td>${D.escapeHtml(payment.location)}</td><td>${D.escapeHtml(payment.method)}</td><td>${D.escapeHtml(payment.note || "-")}</td>
-        <td>${reversible > D.EPSILON ? `<button class="btn btn-ghost btn-small" type="button" data-detail-action="transaction" data-transaction-id="${D.escapeHtml(payment.id)}">Correct</button>` : ""}</td>
+        <td>${D.escapeHtml(payment.username || "—")}</td>
+        <td>${D.escapeHtml(payment.officeSite || payment.location || "—")}</td>
+        <td>${D.escapeHtml(payment.method)}</td>
+        <td>${D.escapeHtml(payment.note || "—")}</td>
+        ${editable ? `<td>${reversible > D.EPSILON ? `<button class="btn btn-ghost btn-small" type="button" data-payments-action="transaction" data-transaction-id="${D.escapeHtml(payment.id)}">Correct</button>` : ""}</td>` : ""}
       </tr>`;
     }).join("")}</tbody></table></div>`;
   }
@@ -746,28 +889,19 @@
     const onTimeText = summary.onTimeRate === null ? "Not measured yet" : `${summary.onTimeRate.toFixed(1)}%`;
     return `
       <div class="detail-section" id="paymentPlanDetailsSection">
-        <div class="detail-section-heading"><div><h3>Payment Plan Performance</h3><p>Ackerman-responsible payments drive the red / yellow / green overdue status. UF-responsible rows can be checked here after Finance confirms the UF payment went through.</p></div>${statusPillsHtml(patient)}</div>
+        <div class="detail-section-heading"><div><h3>Payment Schedule</h3><p>Read-only summary. Use Payments from the main board to edit the schedule or record a collection.</p></div>${statusPillsHtml(patient)}</div>
         <div class="details-summary plan-summary-cards plan-balance-cards">
-          <div class="mini-card"><span>Ackerman overdue</span><strong>${summary.overdueCount}</strong></div>
+          <div class="mini-card"><span>ACC overdue</span><strong>${summary.overdueCount}</strong></div>
           <div class="mini-card"><span>Due today</span><strong>${summary.dueTodayCount}</strong></div>
           <div class="mini-card"><span>UF checks due</span><strong>${summary.ufCheckDueCount}</strong></div>
-          <div class="mini-card"><span>Ackerman on-time</span><strong>${onTimeText}</strong></div>
+          <div class="mini-card"><span>ACC on-time</span><strong>${onTimeText}</strong></div>
         </div>
-        ${summary.ufCheckDueCount ? `<div class="uf-verification-callout"><strong>⚑ Check UF:</strong> ${summary.ufCheckDueCount} UF-responsible payment${summary.ufCheckDueCount === 1 ? " needs" : "s need"} Finance verification. Oldest check is <strong>${summary.oldestUfCheckDays} day${summary.oldestUfCheckDays === 1 ? "" : "s"} past due</strong>.</div>` : ""}
-        <div class="plan-detail-progress">
-          <div class="plan-progress-heading"><span>${D.currency.format(summary.totalOwed)} still outstanding</span><strong>${summary.remainingPercent.toFixed(1)}% remaining</strong></div>
-          <div class="progress-track"><div class="progress-fill health-progress" style="width:${summary.progressPercent.toFixed(2)}%"></div></div>
-        </div>
-        <div class="history-wrap"><table class="history-table plan-history-table"><thead><tr><th>Payment</th><th>Due date</th><th>Responsible</th><th>Scheduled</th><th>Paid / verified</th><th>Remaining</th><th>UF check</th><th>Status</th></tr></thead><tbody>${summary.installments.map((installment) => {
+        ${summary.ufCheckDueCount ? `<div class="uf-verification-callout"><strong>⚑ Check UF:</strong> ${summary.ufCheckDueCount} UF-assigned payment${summary.ufCheckDueCount === 1 ? " has" : "s have"} passed the due date without a UF payment in the ledger. Oldest: <strong>${summary.oldestUfCheckDays} day${summary.oldestUfCheckDays === 1 ? "" : "s"} past due</strong>.</div>` : ""}
+        <div class="plan-detail-progress"><div class="plan-progress-heading"><span>${D.currency.format(summary.totalCollected)} collected</span><strong>${summary.progressPercent.toFixed(1)}%</strong></div><div class="progress-track"><div class="progress-fill health-progress" style="width:${summary.progressPercent.toFixed(2)}%"></div></div></div>
+        <div class="history-wrap"><table class="history-table plan-history-table"><thead><tr><th>Payment</th><th>Due date</th><th>Assigned to</th><th>Assigned amount</th><th>Collected</th><th>Outstanding</th><th>Status</th></tr></thead><tbody>${summary.installments.map((installment) => {
           const mappedStatus = installment.status === "Upcoming" ? "Upcoming Collection" : installment.status;
           const meta = D.statusMeta(mappedStatus);
-          const paidLabel = installment.responsibilityParty === "UF"
-            ? (installment.ufVerified ? "Verified" : "-")
-            : D.currency.format(installment.paidAmount);
-          const ufControl = installment.responsibilityParty === "UF"
-            ? `<label class="detail-uf-check ${installment.ufCheckDue ? "attention" : ""}"><input type="checkbox" data-detail-uf-verify data-installment-id="${D.escapeHtml(installment.id)}" ${installment.ufVerified ? "checked" : ""}><span>${installment.ufVerified ? "Checked" : "Check UF"}</span></label>${installment.ufCheckDue ? `<div class="uf-check-inline-flag">⚑ ${installment.daysLate} day${installment.daysLate === 1 ? "" : "s"} past due</div>` : ""}`
-            : '<span class="cell-secondary">—</span>';
-          return `<tr><td><strong>${installment.number}</strong></td><td>${D.formatDate(installment.dueDate)}</td><td><strong>${D.escapeHtml(installment.responsibilityParty)}</strong></td><td>${D.currency.format(installment.amount)}</td><td>${D.escapeHtml(paidLabel)}</td><td>${D.currency.format(installment.remaining)}</td><td>${ufControl}</td><td><span class="status-pill ${meta.pill} compact">${D.escapeHtml(installment.status)}${installment.status === "Paid" && installment.onTime ? " · On time" : ""}</span>${installment.responsibilityParty === "UF" && installment.ufVerifiedAt ? `<div class="cell-secondary">Checked ${D.formatDate(installment.ufVerifiedAt)}</div>` : ""}</td></tr>`;
+          return `<tr><td><strong>${installment.number}</strong></td><td>${D.formatDate(installment.dueDate)}</td><td><strong>${installment.responsibilityParty === "UF" ? "UF" : "ACC"}</strong></td><td>${D.currency.format(installment.amount)}</td><td>${D.currency.format(installment.paidAmount)}</td><td>${D.currency.format(installment.remaining)}</td><td><span class="status-pill ${meta.pill} compact">${D.escapeHtml(installment.status)}${installment.status === "Paid" && installment.onTime ? " · On time" : ""}</span>${installment.ufCheckDue ? `<div class="uf-check-inline-flag">⚑ ${installment.daysLate} day${installment.daysLate === 1 ? "" : "s"} past due</div>` : ""}</td></tr>`;
         }).join("")}</tbody></table></div>
       </div>`;
   }
@@ -776,30 +910,10 @@
     detailsPatientId = patient.id;
     detailsFocus = focus;
     const status = D.effectiveStatus(patient);
-    const plan = planForPatient(patient);
-    const owed = plan ? plan.totalOwed : D.amountOwed(patient);
-    const ackermanCollectable = plan ? plan.ackermanOwed : owed;
-    const financialCards = plan
-      ? `
-        <div class="details-summary plan-account-summary simplified-financial-summary">
-          <div class="mini-card"><span>Total responsibility</span><strong>${D.currency.format(patient.responsibility)}</strong></div>
-          <div class="mini-card"><span>Ackerman outstanding</span><strong>${D.currency.format(plan.ackermanOwed)}</strong></div>
-          <div class="mini-card"><span>UF outstanding</span><strong>${D.currency.format(plan.ufOwed)}</strong></div>
-          <div class="mini-card"><span>Total outstanding</span><strong>${D.currency.format(plan.totalOwed)}</strong></div>
-          <div class="mini-card"><span>Complete</span><strong>${plan.progressPercent.toFixed(1)}%</strong></div>
-          <div class="mini-card"><span>Remaining</span><strong>${plan.remainingPercent.toFixed(1)}%</strong></div>
-        </div>`
-      : `
-        <div class="details-summary four-up">
-          <div class="mini-card"><span>Responsibility</span><strong>${D.currency.format(patient.responsibility)}</strong></div>
-          <div class="mini-card"><span>Net collected</span><strong>${D.currency.format(D.netCollected(patient))}</strong></div>
-          <div class="mini-card"><span>Adjustments</span><strong>${D.currency.format(D.adjustmentTotal(patient))}</strong></div>
-          <div class="mini-card"><span>Still owed</span><strong>${D.currency.format(owed)}</strong></div>
-        </div>`;
     document.getElementById("detailsTitle").textContent = patient.name;
-    document.getElementById("detailsSubtitle").textContent = `${patient.mrn} · ${status}`;
+    document.getElementById("detailsSubtitle").textContent = `${patient.mrn} · ${status} · Read-only summary`;
     document.getElementById("detailsBody").innerHTML = `
-      ${financialCards}
+      ${paymentsFinancialSummaryHtml(patient)}
       <div class="detail-section">
         <h3>Account Overview</h3>
         <div class="detail-grid">
@@ -807,7 +921,7 @@
           <div class="detail-item"><span>Status / action note</span><strong>${D.escapeHtml(patient.statusNote || "-")}</strong></div>
           <div class="detail-item"><span>Arrangement</span><strong>${D.escapeHtml(D.arrangementFromLegacy(patient))}</strong></div>
           <div class="detail-item"><span>Next due / collection date</span><strong>${D.formatDate(D.nextActionDate(patient))} (${D.escapeHtml(dateRelativeText(D.nextActionDate(patient)))})</strong></div>
-          <div class="detail-item"><span>Treatment type</span><strong>${D.escapeHtml(patient.treatment)}</strong></div>
+          <div class="detail-item"><span>Treatment flags</span><strong><span class="treatment-badges">${D.patientTreatments(patient).map((treatment) => `<span class="treatment-badge">${D.escapeHtml(treatment)}</span>`).join("")}</span></strong></div>
           <div class="detail-item"><span>Treatment site</span><strong>${D.escapeHtml(patient.location)}</strong></div>
           <div class="detail-item"><span>Insurance</span><strong>${D.escapeHtml(patient.insurance)}</strong></div>
           <div class="detail-item"><span>Account created</span><strong>${D.escapeHtml(D.formatDateTime(patient.createdAt))}</strong></div>
@@ -816,23 +930,22 @@
       </div>
       ${planDetailsHtml(patient)}
       <div class="detail-section"><h3>Finance Note</h3><div class="notes-box">${D.escapeHtml(patient.notes || "No finance note entered.")}</div>${patient.noResponsibilityReason ? `<div class="notes-box"><strong>No-responsibility reason:</strong> ${D.escapeHtml(patient.noResponsibilityReason)}</div>` : ""}</div>
-      <div class="detail-section"><div class="detail-section-heading"><div><h3>Payment Ledger</h3><p>Corrections create new reversal/refund entries; original transactions remain visible.</p></div></div>${paymentHistoryHtml(patient)}</div>
-      <div class="detail-section"><div class="detail-section-heading"><div><h3>Adjustments</h3><p>Adjustments reduce the amount owed without increasing collected dollars.</p></div><button class="btn btn-secondary btn-small" type="button" data-detail-action="add-adjustment">Add Adjustment</button></div>${adjustmentHistoryHtml(patient)}</div>
+      <div class="detail-section"><div class="detail-section-heading"><div><h3>Payment Ledger</h3><p>Read-only here. Use Payments from the main board for new records or corrections.</p></div></div>${paymentHistoryHtml(patient, false)}</div>
+      <div class="detail-section"><div class="detail-section-heading"><div><h3>Adjustments</h3><p>Financial adjustments are shown for reference.</p></div></div>${adjustmentHistoryHtml(patient)}</div>
       <div class="detail-section activity-section" id="activityTimelineSection"><div class="detail-section-heading"><div><h3>Activity Timeline</h3><p>Chronological history of account, payment, plan, document, and completion activity.</p></div></div>${activityTimelineHtml(patient)}</div>
     `;
 
-    document.getElementById("detailsPaymentButton").hidden = ackermanCollectable <= D.EPSILON;
-    document.getElementById("detailsCompleteButton").hidden = false;
-    document.getElementById("detailsDocumentsButton").textContent = "Documents";
-    if (Docs) {
-      try {
-        const count = await Docs.count(patient.id);
-        document.getElementById("detailsDocumentsButton").textContent = count ? `Documents (${count})` : "Documents";
-      } catch (error) { console.warn(error); }
-    }
+    const detailsBody = document.getElementById("detailsBody");
+    // Dialog scroll position is preserved by browsers between openings. Always start
+    // a normal View Details request at the top so the financial summary is never
+    // clipped by the previous patient's scroll position.
+    detailsBody.scrollTop = 0;
     if (!elements.detailsDialog.open) elements.detailsDialog.showModal();
-    if (focus === "timeline") requestAnimationFrame(() => document.getElementById("activityTimelineSection")?.scrollIntoView({ block: "start" }));
-    if (focus === "plan") requestAnimationFrame(() => document.getElementById("paymentPlanDetailsSection")?.scrollIntoView({ block: "start" }));
+    requestAnimationFrame(() => {
+      detailsBody.scrollTop = 0;
+      if (focus === "timeline") document.getElementById("activityTimelineSection")?.scrollIntoView({ block: "start" });
+      if (focus === "plan") document.getElementById("paymentPlanDetailsSection")?.scrollIntoView({ block: "start" });
+    });
   }
 
   function openCompletionDialog(patient) {
@@ -881,12 +994,11 @@
     const existing = id ? findPatient(id) : null;
     const arrangement = document.getElementById("patientArrangement").value;
     let responsibility = Number(document.getElementById("patientResponsibility").value || 0);
-    const openingCollected = existing ? D.netCollected(existing) : Number(document.getElementById("patientCollected").value || 0);
+    const openingCollected = existing ? D.netCollected(existing) : 0;
 
-    if (!Number.isFinite(responsibility) || responsibility < 0 || !Number.isFinite(openingCollected) || openingCollected < 0) return showToast("Responsibility and opening payment must be valid nonnegative numbers.", "error");
+    if (!Number.isFinite(responsibility) || responsibility < 0) return showToast("Patient responsibility must be a valid nonnegative number.", "error");
     if (arrangement === "No Responsibility") responsibility = 0;
     if (arrangement === "No Responsibility" && existing && D.netCollected(existing) > D.EPSILON) return showToast("An account with payment history cannot be changed to No Patient Responsibility.", "error");
-    if (openingCollected > responsibility && arrangement !== "No Responsibility") return showToast("Opening payment cannot exceed patient responsibility.", "error");
 
     const collectionDateInput = document.getElementById("patientDate").value;
     if (arrangement === "Payment Plan" && !validOperationalDate(collectionDateInput, "Collection date")) return;
@@ -898,7 +1010,7 @@
     let planChanged = false;
     if (arrangement === "Payment Plan") {
       editingPlanSchedule = readPlanScheduleFromDom();
-      const planOpeningCollected = Number(document.getElementById("planOpeningCollected").value || 0);
+      const planOpeningCollected = 0;
       const invalidInstallment = editingPlanSchedule.some((installment) =>
         !installment.dueDate
         || !Number.isFinite(installment.amount)
@@ -928,7 +1040,7 @@
           id: D.uid("plan-history"),
           date: D.todayIso(),
           reason: "Manual schedule update",
-          detail: `${paymentPlan.installments.length} payment rows · ${ackermanCount} Ackerman responsible · ${ufCount} UF responsible.`,
+          detail: `${paymentPlan.installments.length} payment rows · ${ackermanCount} ACC responsible · ${ufCount} UF responsible.`,
           createdAt: new Date().toISOString()
         });
       }
@@ -939,7 +1051,8 @@
       name: document.getElementById("patientName").value.trim(),
       mrn: document.getElementById("patientMrn").value.trim().toUpperCase(),
       location: document.getElementById("patientLocation").value,
-      treatment: document.getElementById("patientTreatment").value,
+      treatments: [...document.querySelectorAll('input[name="patientTreatmentFlag"]:checked')].map((checkbox) => checkbox.value),
+      treatment: [...document.querySelectorAll('input[name="patientTreatmentFlag"]:checked')].map((checkbox) => checkbox.value).join(" · "),
       insurance: document.getElementById("patientInsurance").value.trim(),
       responsibility,
       collected: existing ? D.netCollected(existing) : 0,
@@ -960,6 +1073,7 @@
     };
 
     if (!record.name || !record.mrn || !record.insurance || !record.collectionDate) return showToast("Complete all required fields.", "error");
+    if (!record.treatments.length) return showToast("Select at least one treatment flag.", "error");
     if (patients.some((patient) => patient.mrn.toLowerCase() === record.mrn.toLowerCase() && patient.id !== record.id)) return showToast("That MRN already exists in the prototype.", "error");
 
     if (existing && Math.abs(Number(existing.responsibility || 0) - responsibility) > D.EPSILON && (existing.payments || []).length) {
@@ -967,16 +1081,16 @@
     }
     if (!existing) {
       D.addActivity(record, { type: "account", title: "Patient account created", detail: `${arrangement} account with ${D.currency.format(responsibility)} responsibility.`, date: D.todayIso() });
-      if (openingCollected > D.EPSILON) D.addPaymentTransaction(record, { type: "Payment", amount: openingCollected, date: collectionDate, location: record.location, method: "Previously Collected", note: "Opening payment entered with the patient record.", appliesToPlan: false });
     } else {
       const changes = [];
-      ["name", "mrn", "location", "treatment", "insurance", "collectionDate", "statusNote", "notes"].forEach((key) => {
+      ["name", "mrn", "location", "insurance", "collectionDate", "statusNote", "notes"].forEach((key) => {
         if (String(existing[key] || "") !== String(record[key] || "")) changes.push(key);
       });
+      if (D.treatmentLabel(existing) !== record.treatment) changes.push("treatments");
       if (Math.abs(existing.responsibility - record.responsibility) > D.EPSILON) changes.push("responsibility");
       if (D.arrangementFromLegacy(existing) !== arrangement) changes.push("arrangement");
       if (changes.length) D.addActivity(record, { type: "account", title: "Account details updated", detail: `Changed: ${changes.join(", ")}.`, date: D.todayIso() });
-      if (planChanged) D.addActivity(record, { type: "plan", title: "Payment plan schedule updated", detail: "Due dates, amounts, responsibility assignments, or UF verification status were changed.", date: D.todayIso() });
+      if (planChanged) D.addActivity(record, { type: "plan", title: "Payment plan schedule updated", detail: "Due dates, amounts, or ACC/UF responsibility assignments were changed.", date: D.todayIso() });
     }
 
     const normalized = D.normalizePatient(record);
@@ -994,22 +1108,30 @@
     const patient = findPatient(document.getElementById("paymentPatientId").value);
     if (!patient) return showToast("The selected patient could not be found.", "error");
     const amount = Number(document.getElementById("paymentAmount").value);
-    const balance = collectableAmount(patient);
     const date = document.getElementById("paymentDate").value;
+    const username = document.getElementById("paymentUsername").value.trim();
+    const officeSite = document.getElementById("paymentOfficeSite").value;
+    const installmentId = document.getElementById("paymentInstallmentId").value;
+    const responsibilityParty = document.getElementById("paymentResponsibilityParty").value === "UF" ? "UF" : "Ackerman";
     if (!validOperationalDate(date, "Payment date")) return;
-    if (!Number.isFinite(amount) || amount <= 0 || amount > balance + D.EPSILON) return showToast(`Enter a payment between $0.01 and ${D.currency.format(balance)}.`, "error");
+    if (!Number.isFinite(amount) || amount <= 0) return showToast("Enter a collected amount greater than $0.00.", "error");
+    if (!username) return showToast("Username / staff member is required.", "error");
+    if (!officeSite) return showToast("Office site is required.", "error");
 
-    const appliesToPlan = D.effectiveStatus(patient) === "Payment Plan" && Boolean(patient.paymentPlan);
     D.addPaymentTransaction(patient, {
       type: "Payment", amount, date,
-      location: document.getElementById("paymentLocation").value,
+      location: patient.location, officeSite, username, responsibilityParty, installmentId,
       method: document.getElementById("paymentMethod").value,
-      note: document.getElementById("paymentNote").value.trim(), appliesToPlan
+      note: document.getElementById("paymentNote").value.trim(), appliesToPlan: true
     });
+    const normalized = D.normalizePatient(patient);
+    const index = patients.findIndex((item) => item.id === normalized.id);
+    if (index >= 0) patients[index] = normalized;
     D.savePatients(patients);
     elements.paymentDialog.close();
     render();
-    showToast(`${D.currency.format(amount)} recorded for ${patient.name}${appliesToPlan ? " and applied to the payment plan" : ""}.`);
+    openPaymentsDialog(normalized);
+    showToast(`${D.currency.format(amount)} ${responsibilityParty === "UF" ? "UF" : "ACC"} payment recorded for ${patient.name}.`);
   });
 
 
@@ -1029,6 +1151,7 @@
     elements.adjustmentDialog.close();
     render();
     if (elements.detailsDialog.open) openDetailsDialog(patient);
+    if (paymentsPatientId === patient.id) openPaymentsDialog(patient);
     showToast(`${D.currency.format(amount)} ${document.getElementById("adjustmentType").value.toLowerCase()} recorded for ${patient.name}.`);
   });
 
@@ -1046,20 +1169,27 @@
     if (!Number.isFinite(amount) || amount <= 0 || amount > available + D.EPSILON) return showToast(`Enter an amount between $0.01 and ${D.currency.format(available)}.`, "error");
     if (!reason) return showToast("A reason is required.", "error");
 
+    const shared = {
+      date, location: original.location, officeSite: original.officeSite, username: original.username,
+      responsibilityParty: original.responsibilityParty, installmentId: original.installmentId,
+      appliesToPlan: original.appliesToPlan, relatedTransactionId: original.id
+    };
     if (action === "Correction") {
       const correctedAmount = Number(document.getElementById("correctedAmount").value);
-      const maxCorrected = D.amountOwed(patient) + amount;
-      if (!Number.isFinite(correctedAmount) || correctedAmount <= 0 || correctedAmount > maxCorrected + D.EPSILON) return showToast(`Corrected payment must be between $0.01 and ${D.currency.format(maxCorrected)}.`, "error");
-      D.addPaymentTransaction(patient, { type: "Correction Reversal", amount, date, location: original.location, method: original.method, note: reason, appliesToPlan: original.appliesToPlan, relatedTransactionId: original.id }, false);
-      D.addPaymentTransaction(patient, { type: "Correction Payment", amount: correctedAmount, date, location: original.location, method: document.getElementById("correctedMethod").value, note: `Correction: ${reason}`, appliesToPlan: original.appliesToPlan, relatedTransactionId: original.id }, false);
+      if (!Number.isFinite(correctedAmount) || correctedAmount <= 0) return showToast("Corrected payment must be greater than $0.00.", "error");
+      D.addPaymentTransaction(patient, { ...shared, type: "Correction Reversal", amount, method: original.method, note: reason }, false);
+      D.addPaymentTransaction(patient, { ...shared, type: "Correction Payment", amount: correctedAmount, method: document.getElementById("correctedMethod").value, note: `Correction: ${reason}` }, false);
       D.addActivity(patient, { type: "payment", title: "Payment corrected", detail: `${D.currency.format(amount)} reversed and replaced with ${D.currency.format(correctedAmount)} · ${reason}`, date });
     } else {
-      D.addPaymentTransaction(patient, { type: action, amount, date, location: original.location, method: original.method, note: reason, appliesToPlan: original.appliesToPlan, relatedTransactionId: original.id });
+      D.addPaymentTransaction(patient, { ...shared, type: action, amount, method: original.method, note: reason });
     }
+    const normalized = D.normalizePatient(patient);
+    const index = patients.findIndex((item) => item.id === normalized.id);
+    if (index >= 0) patients[index] = normalized;
     D.savePatients(patients);
     elements.transactionDialog.close();
     render();
-    openDetailsDialog(patient);
+    openPaymentsDialog(normalized);
     showToast(`${action === "Correction" ? "Correction" : action} recorded for ${patient.name}.`);
   });
 
@@ -1069,10 +1199,16 @@
     if (!button) return;
     const patient = findPatient(button.dataset.id);
     if (!patient) return;
-    if (button.dataset.action === "payment") openPaymentDialog(patient);
+    if (button.dataset.action === "toggle-row") {
+      if (collapsedPatientIds.has(patient.id)) collapsedPatientIds.delete(patient.id);
+      else collapsedPatientIds.add(patient.id);
+      renderRows();
+      return;
+    }
+    if (button.dataset.action === "payments") openPaymentsDialog(patient);
     if (button.dataset.action === "details") openDetailsDialog(patient);
     if (button.dataset.action === "timeline") openDetailsDialog(patient, "timeline");
-    if (button.dataset.action === "uf-check") openDetailsDialog(patient, "plan");
+    if (button.dataset.action === "uf-check") openPaymentsDialog(patient);
     if (button.dataset.action === "edit") openPatientDialog(patient);
     if (button.dataset.action === "adjustment") openAdjustmentDialog(patient);
     if (button.dataset.action === "complete") openCompletionDialog(patient);
@@ -1092,52 +1228,104 @@
     showToast(`Status note saved for ${patient.name}.`);
   });
 
-  document.getElementById("detailsBody").addEventListener("click", (event) => {
-    const button = event.target.closest("button[data-detail-action]");
-    if (!button) return;
-    const patient = findPatient(detailsPatientId);
+  document.getElementById("paymentsScheduleBody").addEventListener("input", () => {
+    const patient = findPatient(paymentsPatientId);
     if (!patient) return;
-    if (button.dataset.detailAction === "add-adjustment") return openAdjustmentDialog(patient);
-    if (button.dataset.detailAction === "transaction") {
-      const transaction = D.normalizedPayments(patient).find((item) => item.id === button.dataset.transactionId);
-      if (transaction) openTransactionDialog(patient, transaction);
+    paymentsScheduleDraft = readPaymentsScheduleDraft();
+    refreshPaymentsScheduleSummary(patient);
+  });
+
+  document.getElementById("paymentsScheduleBody").addEventListener("change", () => {
+    const patient = findPatient(paymentsPatientId);
+    if (!patient) return;
+    paymentsScheduleDraft = readPaymentsScheduleDraft();
+    refreshPaymentsScheduleSummary(patient);
+  });
+
+  document.getElementById("paymentsScheduleBody").addEventListener("click", (event) => {
+    const button = event.target.closest("button[data-payments-action]");
+    if (!button) return;
+    const patient = findPatient(paymentsPatientId);
+    if (!patient) return;
+    paymentsScheduleDraft = readPaymentsScheduleDraft();
+    const action = button.dataset.paymentsAction;
+    const installmentId = button.dataset.installmentId;
+    if (action === "record") {
+      const savedSnapshot = paymentsScheduleSnapshot(patient.paymentPlan?.installments || []);
+      if (paymentsScheduleSnapshot(paymentsScheduleDraft) !== savedSnapshot) return showToast("Save schedule changes before recording a payment.", "error");
+      return openPaymentDialog(patient, installmentId);
+    }
+    if (action === "remove") {
+      if (paymentsScheduleDraft.length <= 1) return showToast("A payment plan needs at least one scheduled payment.", "error");
+      const hasLedger = D.normalizedPayments(patient).some((payment) => payment.installmentId === installmentId && Math.abs(D.transactionEffect(payment)) > D.EPSILON);
+      if (hasLedger && !window.confirm("This scheduled payment has ledger activity. Removing the schedule row will keep those ledger entries as historical records. Continue?")) return;
+      paymentsScheduleDraft = paymentsScheduleDraft.filter((item) => item.id !== installmentId);
+      renderPaymentsWorkspace(patient);
     }
   });
 
-  document.getElementById("detailsBody").addEventListener("change", (event) => {
-    const checkbox = event.target.closest("input[data-detail-uf-verify]");
-    if (!checkbox) return;
-    const patient = findPatient(detailsPatientId);
-    if (!patient?.paymentPlan) return;
-    const installment = patient.paymentPlan.installments.find((item) => item.id === checkbox.dataset.installmentId);
-    if (!installment || installment.responsibilityParty !== "UF") return;
+  document.getElementById("paymentsLedger").addEventListener("click", (event) => {
+    const button = event.target.closest("button[data-payments-action='transaction']");
+    if (!button) return;
+    const patient = findPatient(paymentsPatientId);
+    if (!patient) return;
+    const transaction = D.normalizedPayments(patient).find((item) => item.id === button.dataset.transactionId);
+    if (!transaction) return;
+    if (elements.paymentsDialog.open) elements.paymentsDialog.close();
+    openTransactionDialog(patient, transaction);
+  });
 
-    installment.ufVerified = checkbox.checked;
-    installment.ufVerifiedAt = checkbox.checked ? (installment.ufVerifiedAt || D.todayIso()) : "";
-    D.addActivity(patient, {
-      type: "plan",
-      title: checkbox.checked ? "UF payment verified" : "UF verification cleared",
-      detail: `UF-responsible payment due ${D.formatDate(installment.dueDate)} for ${D.currency.format(installment.amount)} was ${checkbox.checked ? "confirmed as received" : "returned to pending verification"}.`,
-      date: D.todayIso()
+  document.getElementById("addScheduledPaymentButton").addEventListener("click", () => {
+    const patient = findPatient(paymentsPatientId);
+    if (!patient) return;
+    paymentsScheduleDraft = readPaymentsScheduleDraft();
+    const last = paymentsScheduleDraft.slice().sort((a, b) => String(a.dueDate).localeCompare(String(b.dueDate))).at(-1);
+    const f = D.financialBreakdown(patient);
+    paymentsScheduleDraft.push({
+      id: D.uid("installment"),
+      dueDate: last?.dueDate ? D.addDays(last.dueDate, 30) : D.todayIso(),
+      originalDueDate: last?.dueDate ? D.addDays(last.dueDate, 30) : D.todayIso(),
+      amount: Math.max(0.01, f.totalOutstanding > 0 ? f.totalOutstanding : 0.01),
+      responsibilityParty: "Ackerman", ufVerified: false, ufVerifiedAt: "", rescheduledAt: "", isNew: true
     });
-    D.savePatients(patients);
-    render();
-    openDetailsDialog(patient, "plan");
-    showToast(checkbox.checked ? "UF payment marked checked / went through." : "UF payment returned to pending verification.");
+    renderPaymentsWorkspace(patient);
   });
 
-  document.getElementById("detailsEditButton").addEventListener("click", () => {
-    const patient = findPatient(detailsPatientId);
+  document.getElementById("savePaymentScheduleButton").addEventListener("click", () => {
+    const patient = findPatient(paymentsPatientId);
     if (!patient) return;
-    elements.detailsDialog.close();
-    openPatientDialog(patient);
+    paymentsScheduleDraft = readPaymentsScheduleDraft();
+    if (!paymentsScheduleDraft.length) return showToast("A payment plan needs at least one scheduled payment.", "error");
+    for (const installment of paymentsScheduleDraft) {
+      if (!validOperationalDate(installment.dueDate, "Scheduled payment due date")) return;
+      if (!Number.isFinite(installment.amount) || installment.amount <= 0) return showToast("Every scheduled payment needs an amount greater than $0.00.", "error");
+    }
+    const previous = patient.paymentPlan || { createdDate: D.todayIso(), openingCollected: 0, renegotiationCount: 0, history: [] };
+    patient.paymentPlan = {
+      createdDate: previous.createdDate || D.todayIso(), openingCollected: 0, promiseToPayDate: "",
+      renegotiationCount: Number(previous.renegotiationCount || 0) + 1,
+      history: [...(previous.history || []), { id: D.uid("plan-history"), date: D.todayIso(), reason: "Payment schedule updated", detail: `${paymentsScheduleDraft.length} scheduled payments · edited from Payments workspace.`, createdAt: new Date().toISOString() }],
+      installments: paymentsScheduleDraft.map(({ isNew, ...item }) => ({ ...item, ufVerified: false, ufVerifiedAt: "" })).sort((a, b) => a.dueDate.localeCompare(b.dueDate))
+    };
+    patient.collectionDate = patient.paymentPlan.installments[0]?.dueDate || patient.collectionDate;
+    D.addActivity(patient, { type: "plan", title: "Payment schedule updated", detail: `${patient.paymentPlan.installments.length} scheduled payments. Assigned totals were updated without changing Total Patient Responsibility.`, date: D.todayIso() });
+    const normalized = D.normalizePatient(patient);
+    const index = patients.findIndex((item) => item.id === normalized.id);
+    if (index >= 0) patients[index] = normalized;
+    D.savePatients(patients);
+    populateFilters();
+    render();
+    openPaymentsDialog(normalized);
+    showToast(`Payment schedule saved for ${normalized.name}.`);
   });
-  document.getElementById("detailsPaymentButton").addEventListener("click", () => {
-    const patient = findPatient(detailsPatientId);
+
+  document.getElementById("paymentsAdjustmentButton").addEventListener("click", () => {
+    const patient = findPatient(paymentsPatientId);
     if (!patient) return;
-    elements.detailsDialog.close();
-    openPaymentDialog(patient);
+    if (elements.paymentsDialog.open) elements.paymentsDialog.close();
+    openAdjustmentDialog(patient);
   });
+
   async function printSummary(patient) {
     let documents = [];
     if (Docs) {
@@ -1151,18 +1339,6 @@
   document.getElementById("detailsPrintButton").addEventListener("click", () => {
     const patient = findPatient(detailsPatientId);
     if (patient) printSummary(patient);
-  });
-  document.getElementById("detailsFinancialButton").addEventListener("click", () => {
-    const patient = findPatient(detailsPatientId);
-    if (patient) openAdjustmentDialog(patient);
-  });
-  document.getElementById("detailsCompleteButton").addEventListener("click", () => {
-    const patient = findPatient(detailsPatientId);
-    if (patient) openCompletionDialog(patient);
-  });
-  document.getElementById("detailsDocumentsButton").addEventListener("click", () => {
-    const patient = findPatient(detailsPatientId);
-    if (patient && Docs) Docs.open(patient);
   });
 
   document.getElementById("completionForm").addEventListener("submit", (event) => {
@@ -1180,39 +1356,13 @@
   document.getElementById("addPatientButton").addEventListener("click", () => openPatientDialog());
   document.getElementById("patientArrangement").addEventListener("change", () => toggleArrangementSection({ autoBuild: true }));
   document.getElementById("buildPlanButton").addEventListener("click", buildPlanSchedule);
-  elements.planScheduleBody.addEventListener("input", (event) => {
-    const row = event.target.closest("tr");
-    if (!row) return;
-
-    if (event.target.matches("input[data-plan-field='responsibilityParty']")) {
-      const isUf = event.target.value === "UF" && event.target.checked;
-      const verifyControl = row.querySelector(".uf-verify-control");
-      const verified = row.querySelector("input[data-plan-field='ufVerified']");
-      verifyControl.hidden = !isUf;
-      if (!isUf) {
-        verified.checked = false;
-        row.dataset.ufVerifiedAt = "";
-      }
-    }
-
-    if (event.target.matches("input[data-plan-field='ufVerified']")) {
-      row.dataset.ufVerifiedAt = event.target.checked ? (row.dataset.ufVerifiedAt || D.todayIso()) : "";
-    }
-
-    const party = row.querySelector("input[data-plan-field='responsibilityParty']:checked")?.value || "Ackerman";
-    const dueDate = row.querySelector("input[data-plan-field='dueDate']")?.value || "";
-    const ufVerified = Boolean(row.querySelector("input[data-plan-field='ufVerified']")?.checked);
-    const flag = row.querySelector(".uf-check-flag");
-    const checkDue = party === "UF" && !ufVerified && dueDate && D.addDays(dueDate, 2) <= D.todayIso();
-    if (flag) flag.hidden = !checkDue;
-
+  elements.planScheduleBody.addEventListener("input", () => {
+    updatePlanEditorSummary();
+  });
+  elements.planScheduleBody.addEventListener("change", () => {
     updatePlanEditorSummary();
   });
   document.getElementById("patientResponsibility").addEventListener("input", updatePlanEditorSummary);
-  document.getElementById("patientCollected").addEventListener("input", () => {
-    if (!editingExistingPlan && document.getElementById("patientArrangement").value === "Payment Plan") document.getElementById("planOpeningCollected").value = document.getElementById("patientCollected").value || "0";
-    updatePlanEditorSummary();
-  });
 
   document.getElementById("adjustmentAmount").addEventListener("input", () => {
     const patient = findPatient(document.getElementById("adjustmentPatientId").value);
@@ -1258,6 +1408,18 @@
     elements.search.value = ""; elements.statusFilter.value = "all"; elements.locationFilter.value = "all"; elements.treatmentFilter.value = "all"; quickFilter = ""; render();
   });
 
+  if (elements.toggleAllRowsButton) {
+    elements.toggleAllRowsButton.addEventListener("click", () => {
+      const visible = filteredPatients();
+      const allCollapsed = visible.length > 0 && visible.every((patient) => collapsedPatientIds.has(patient.id));
+      visible.forEach((patient) => {
+        if (allCollapsed) collapsedPatientIds.delete(patient.id);
+        else collapsedPatientIds.add(patient.id);
+      });
+      renderRows();
+    });
+  }
+
   elements.savedViewSelect.addEventListener("change", () => {
     const view = D.loadSavedViews("board").find((item) => item.id === elements.savedViewSelect.value);
     document.getElementById("deleteViewButton").disabled = !view;
@@ -1287,40 +1449,29 @@
     if (!visiblePatients.length) return showToast("No visible records to export.", "error");
     if (!window.AckermanExcel) return showToast("Excel export could not be loaded.", "error");
 
-    const headers = ["Status", "Payment Attention", "Status Note", "Patient Name", "MRN", "Treatment Site", "Treatment Type", "Insurance", "Responsibility", "Net Collected", "Adjustments", "Amount Owed", "Ackerman Owes", "UF Owes", "Plan Remaining %", "Next Due Date", "Plan Payments", "Plan Payments Completed / Verified", "Ackerman Overdue Payments", "UF Checks Due", "Oldest UF Check Days", "Plan On-Time Rate", "Account Created", "Last Updated"];
+    const headers = [
+      "Status", "Payment Attention", "Status Note", "Patient Name", "MRN", "Treatment Site", "Treatment Flags", "Insurance",
+      "Total Patient Responsibility", "Collected Total Patient Responsibility", "Outstanding Total Patient Responsibility",
+      "ACC Assigned Patient Responsibility", "Collected ACC Assigned Patient Responsibility", "Outstanding ACC Assigned Patient Responsibility",
+      "UF Assigned Patient Responsibility", "Collected UF Assigned Patient Responsibility", "Outstanding UF Assigned Patient Responsibility",
+      "Adjustments", "Next Due Date", "Plan Payments", "Plan Payments Completed", "ACC Overdue Payments", "UF Checks Due", "Oldest UF Check Days", "Plan On-Time Rate", "Account Created", "Last Updated"
+    ];
     const rows = visiblePatients.map((patient) => {
       const plan = D.planSummary(patient);
+      const f = D.financialBreakdown(patient);
       return [
-        frontPageStatus(patient),
-        D.attentionStatus(patient),
-        patient.statusNote || "",
-        patient.name,
-        patient.mrn,
-        patient.location,
-        patient.treatment,
-        patient.insurance,
-        patient.responsibility,
-        D.netCollected(patient),
-        D.adjustmentTotal(patient),
-        D.amountOwed(patient),
-        plan?.ackermanOwed ?? "",
-        plan?.ufOwed ?? "",
-        plan ? plan.remainingPercent / 100 : "",
-        D.nextActionDate(patient),
-        plan?.totalCount || 0,
-        plan?.completedCount || 0,
-        plan?.overdueCount || 0,
-        plan?.ufCheckDueCount || 0,
-        plan?.oldestUfCheckDays || 0,
-        plan?.onTimeRate === null || !plan ? "" : plan.onTimeRate / 100,
-        patient.createdAt || "",
-        patient.updatedAt || ""
+        frontPageStatus(patient), D.attentionStatus(patient), patient.statusNote || "", patient.name, patient.mrn, patient.location, D.treatmentLabel(patient), patient.insurance,
+        f.totalAssigned, f.totalCollected, f.totalOutstanding,
+        f.accAssigned, f.accCollected, f.accOutstanding,
+        f.ufAssigned, f.ufCollected, f.ufOutstanding,
+        f.adjustments, D.nextActionDate(patient), plan?.totalCount || 0, plan?.completedCount || 0, plan?.overdueCount || 0, plan?.ufCheckDueCount || 0, plan?.oldestUfCheckDays || 0,
+        plan?.onTimeRate === null || !plan ? "" : plan.onTimeRate / 100, patient.createdAt || "", patient.updatedAt || ""
       ];
     });
 
     const types = [
-      "text", "text", "wrap", "text", "text", "text", "text", "text",
-      "currency", "currency", "currency", "currency", "currency", "currency", "percent", "date",
+      "text", "text", "wrap", "text", "text", "text", "wrap", "text",
+      "currency", "currency", "currency", "currency", "currency", "currency", "currency", "currency", "currency", "currency", "date",
       "integer", "integer", "integer", "integer", "integer", "percent", "datetime", "datetime"
     ];
     const now = new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short" }).format(new Date());
@@ -1329,7 +1480,7 @@
       sheetName: "Active Patients",
       title: "Ackerman Patient Payment Board - Active Patients",
       subtitle: `${rows.length} visible ${rows.length === 1 ? "record" : "records"} · Exported ${now}`,
-      headers, rows, types, statusColumn: 0, flagColumns: [19]
+      headers, rows, types, statusColumn: 0, flagColumns: [22]
     });
     showToast(`${rows.length} visible ${rows.length === 1 ? "record" : "records"} exported to Excel.`);
   });
