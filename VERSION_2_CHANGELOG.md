@@ -1,3 +1,15 @@
+# Ackerman Patient Payment Board — Version 2 Change Log
+
+## Version 2.1.7 — Dark Mode
+
+- Added a persistent Light / Dark mode toggle to all three application pages.
+- Added a fully styled dark theme for the active board, Statistical Analysis, Completed Patients, Payments window, View Details, forms, tables, activity timeline, status colors, filters, and dialogs.
+- Theme preference is stored locally and follows the user between pages.
+- Added pre-paint theme restoration to prevent a white flash when dark mode is already selected.
+- Updated cache-busting asset references to `v=2.1.7`, including the new shared `theme.js`.
+
+---
+
 
 
 ## Version 2.1.6 — Browser Cache Busting

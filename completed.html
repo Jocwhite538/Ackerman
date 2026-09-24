@@ -5,12 +5,24 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="Completed patients for the fictional Ackerman payment prototype.">
   <link rel="icon" href="data:,">
+  <script>
+    (() => {
+      try {
+        const savedTheme = localStorage.getItem("ackermanColorTheme");
+        if (savedTheme === "dark") {
+          document.documentElement.dataset.theme = "dark";
+          document.documentElement.style.colorScheme = "dark";
+        }
+      } catch (_) {}
+    })();
+  </script>
   <title>Ackerman Completed Patients - Prototype</title>
-  <link rel="stylesheet" href="styles.css?v=2.1.6">
-  <script src="data.js?v=2.1.6" defer></script>
-  <script src="documents.js?v=2.1.6" defer></script>
-  <script src="excel-export.js?v=2.1.6" defer></script>
-  <script src="completed.js?v=2.1.6" defer></script>
+  <link rel="stylesheet" href="styles.css?v=2.1.7">
+  <script src="theme.js?v=2.1.7" defer></script>
+  <script src="data.js?v=2.1.7" defer></script>
+  <script src="documents.js?v=2.1.7" defer></script>
+  <script src="excel-export.js?v=2.1.7" defer></script>
+  <script src="completed.js?v=2.1.7" defer></script>
 </head>
 <body>
   <header class="app-header">
@@ -24,7 +36,13 @@
         <a href="analytics.html">Statistical Analysis</a>
         <a class="active" href="completed.html" aria-current="page">Completed Patients</a>
       </nav>
-      <div class="demo-chip">FICTIONAL DATA PROTOTYPE</div>
+      <div class="header-tools">
+        <button class="theme-toggle" type="button" data-theme-toggle aria-pressed="false" aria-label="Switch to dark mode" title="Switch to dark mode">
+          <span class="theme-toggle-icon" data-theme-icon aria-hidden="true">☾</span>
+          <span data-theme-label>Dark</span>
+        </button>
+        <div class="demo-chip">FICTIONAL DATA PROTOTYPE</div>
+      </div>
     </div>
   </header>
 

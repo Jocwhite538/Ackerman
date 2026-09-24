@@ -11,6 +11,15 @@ Version 2.1.3 is a static, clickable workflow prototype for Ackerman Cancer Cent
 - Future releases should update the query-string version when the package version changes. This prevents coworkers who previously opened the GitHub Pages site from continuing to use an older cached CSS/JavaScript bundle after a deployment.
 - No patient, payment, status, or workflow logic changed in this release.
 
+
+## Version 2.1.7 — Dark Mode
+
+- Added a Light / Dark mode toggle to the header on Payment Board, Statistical Analysis, and Completed Patients.
+- Dark mode applies to all cards, tables, forms, dialogs, Payments, View Details, analytics, completed-patient windows, status colors, and responsive layouts.
+- The selected theme is remembered in the browser and carried across all pages.
+- A small early-load theme bootstrap prevents a bright flash when opening a page with dark mode already saved.
+- All local CSS/JavaScript assets now use the Version 2.1.7 cache-busting query string.
+
 ## Version 2.1.5 — Collapsible Patient Rows
 
 - Every active patient row now has an arrow beside the patient name to collapse or expand that patient individually.

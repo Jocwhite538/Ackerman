@@ -39,6 +39,9 @@
   --chart-4: #c78600;
   --chart-5: #18794e;
   --chart-6: #b42318;
+  --navy: var(--navy-900);
+  --navy-700: var(--navy-800);
+  --teal: var(--teal-700);
 }
 
 * {
@@ -175,6 +178,47 @@ button:disabled {
   font-weight: 800;
   letter-spacing: 0.03em;
   white-space: nowrap;
+}
+
+
+.header-tools {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 9px;
+  min-width: 0;
+}
+
+.theme-toggle {
+  min-height: 38px;
+  padding: 7px 11px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 9px;
+  color: #f2f8fb;
+  background: rgba(255, 255, 255, 0.08);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background .15s ease, border-color .15s ease, transform .08s ease;
+}
+
+.theme-toggle:hover {
+  border-color: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.theme-toggle:active { transform: translateY(1px); }
+.theme-toggle-icon {
+  width: 18px;
+  display: inline-grid;
+  place-items: center;
+  font-size: 1rem;
+  line-height: 1;
 }
 
 .page-shell {
@@ -1342,11 +1386,15 @@ dialog::backdrop {
 
 @media (max-width: 1150px) {
   .header-inner {
-    grid-template-columns: minmax(230px, 1fr) auto;
+    grid-template-columns: minmax(230px, 1fr) auto auto;
   }
 
   .demo-chip {
     display: none;
+  }
+
+  .header-tools {
+    gap: 0;
   }
 
   .summary-grid {
@@ -1432,6 +1480,11 @@ dialog::backdrop {
   .header-inner {
     grid-template-columns: 1fr;
     align-items: start;
+  }
+
+  .header-tools {
+    width: 100%;
+    justify-content: flex-end;
   }
 
   .app-nav {
@@ -3549,4 +3602,370 @@ dialog::backdrop {
   .patient-row.is-collapsed .collapsed-financial-summary {
     display: none;
   }
+}
+
+
+/* Version 2.1.7 — dark mode -------------------------------------------------
+   A site-wide, persistent dark theme for all pages, tables, cards, dialogs,
+   payment windows, analytics, completed patients, and responsive layouts. */
+html[data-theme="dark"] {
+  --background: #081118;
+  --surface: #101b24;
+  --surface-muted: #14232d;
+  --border: #263a47;
+  --border-strong: #3a5362;
+  --text: #e8f0f5;
+  --muted: #a8bac5;
+  --muted-2: #7f95a3;
+  --shadow-sm: 0 5px 18px rgba(0, 0, 0, .28);
+  --shadow-md: 0 18px 42px rgba(0, 0, 0, .38);
+  --focus: 0 0 0 3px rgba(48, 190, 201, .24);
+
+  --ready: #10283a;
+  --ready-accent: #75b9e6;
+  --due: #322711;
+  --due-accent: #f0c56e;
+  --overdue: #35181b;
+  --overdue-accent: #ff8c86;
+  --partial: #302b12;
+  --partial-accent: #e8c85c;
+  --plan: #241b3a;
+  --plan-accent: #b89cff;
+  --paid: #123322;
+  --paid-accent: #72d49a;
+  --none: #1a2730;
+  --none-accent: #a9bac5;
+  --danger: #ff918c;
+  --success: #72d49a;
+  --warning: #f0c56e;
+  --chart-1: #3fc1ca;
+  --chart-2: #75b9e6;
+  --chart-3: #b89cff;
+  --chart-4: #e7bb4c;
+  --chart-5: #72d49a;
+  --chart-6: #ff8c86;
+  color-scheme: dark;
+}
+
+html[data-theme="dark"] body {
+  color: var(--text);
+  background: radial-gradient(circle at 50% -20%, #132635 0, #081118 42%, #071017 100%);
+}
+
+/* Header stays brand-dark in both themes, with a slightly brighter active tab. */
+html[data-theme="dark"] .app-header {
+  background: linear-gradient(135deg, #071b29, #123a52);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, .34);
+}
+html[data-theme="dark"] .app-nav a.active {
+  color: #071b29;
+  background: #eaf4f8;
+}
+html[data-theme="dark"] .theme-toggle {
+  color: #f3fbff;
+  border-color: rgba(160, 215, 231, .38);
+  background: rgba(117, 185, 230, .10);
+}
+html[data-theme="dark"] .theme-toggle:hover {
+  background: rgba(117, 185, 230, .18);
+}
+
+/* Strong text that used navy on the light theme. */
+html[data-theme="dark"] :is(
+  .page-heading h2, .summary-value, .kpi-value, .panel-header h3,
+  .patient-name, .patient-link, .financial-line strong,
+  .financial-line.balance strong, .empty-state strong, .mini-card strong,
+  .detail-section h3, .chart-header h3, .horizontal-bar-value,
+  .donut-center strong, .legend-item strong, .insight-card strong,
+  .section-title-row h2, .record-count-badge, .plan-editor-header h3,
+  .document-list-heading h3, .document-info strong, .document-empty strong,
+  .responsibility-summary-card h3, .responsibility-summary-card > div strong,
+  .operation-card strong, .activity-heading strong,
+  .collapsed-financial-primary strong
+) {
+  color: #e8f4fa;
+}
+
+html[data-theme="dark"] :is(
+  .cell-primary, .date-main, .detail-item strong, .vertical-bar-value,
+  .horizontal-bar-label, .legend-item, .breakdown-table td,
+  .activity-content p, .collapsed-financial-primary,
+  #paymentPlanContext
+) {
+  color: #c6d5de;
+}
+
+html[data-theme="dark"] .mrn { color: #9bb0bd; }
+
+/* Inputs and editable controls */
+html[data-theme="dark"] :is(input, select, textarea) {
+  color: var(--text);
+  border-color: var(--border-strong);
+  background: #0d1821;
+  accent-color: #35b9c3;
+}
+html[data-theme="dark"] :is(input, select, textarea)::placeholder { color: #6f8592; }
+html[data-theme="dark"] :is(input, select, textarea):hover { border-color: #587484; }
+html[data-theme="dark"] :is(input, select, textarea):disabled {
+  color: #8295a1;
+  background: #17242d;
+}
+html[data-theme="dark"] input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(.9); }
+
+/* Buttons */
+html[data-theme="dark"] .btn-secondary {
+  color: #dceaf1;
+  border-color: #39505e;
+  background: #1a2a34;
+}
+html[data-theme="dark"] .btn-ghost {
+  color: #cfe4ed;
+  border-color: #314754;
+  background: #101b24;
+}
+html[data-theme="dark"] .btn-danger {
+  color: #ffaaa6;
+  border-color: #713d3c;
+  background: #301b1d;
+}
+html[data-theme="dark"] .btn-success {
+  color: #90e2ae;
+  border-color: #35664a;
+  background: #183225;
+}
+
+/* Notice stays intentionally warm, but is toned down for a dark canvas. */
+html[data-theme="dark"] .notice {
+  color: #f3d68a;
+  border-color: #70591f;
+  border-left-color: #d5a82d;
+  background: #2a2413;
+}
+html[data-theme="dark"] .notice strong { color: #ffe3a0; }
+
+/* Tabs, table chrome, saved views, and analytics cards. */
+html[data-theme="dark"] .view-tabs { background: #0e1a23; }
+html[data-theme="dark"] .tab { color: #a9bac5; background: #17252f; }
+html[data-theme="dark"] .tab.active {
+  color: #eff8fb;
+  border-bottom-color: #101b24;
+  background: #101b24;
+}
+html[data-theme="dark"] .table-meta,
+html[data-theme="dark"] .section-title-row { background: #101b24; }
+html[data-theme="dark"] :is(
+  .payment-table th, .breakdown-table th, .history-table th,
+  .plan-performance-table th, .payments-schedule-table th,
+  .payment-ledger-table th
+) {
+  color: #b8cad4;
+  background: #14232d;
+}
+html[data-theme="dark"] .payment-table tbody tr:hover td { background: rgba(255,255,255,.025); }
+html[data-theme="dark"] .operation-card,
+html[data-theme="dark"] .insight-card {
+  color: var(--text);
+  background: #121f28;
+}
+html[data-theme="dark"] .operation-card:hover,
+html[data-theme="dark"] .operation-card.active { background: #172731; }
+html[data-theme="dark"] .vertical-bar-track,
+html[data-theme="dark"] .horizontal-bar-track,
+html[data-theme="dark"] .rate-track { background: #22323c; }
+html[data-theme="dark"] .donut { background: conic-gradient(#263741 0 100%); }
+
+/* Status rows remain instantly recognizable without glowing on a dark screen. */
+html[data-theme="dark"] .status-pill {
+  background: rgba(5, 13, 19, .48);
+}
+html[data-theme="dark"] .status-pill.grace { color: #efbd67; border-color: #a8772d; background: #302610; }
+html[data-theme="dark"] .status-pill.promise { color: #66d4da; border-color: #318f96; background: #102d31; }
+html[data-theme="dark"] .ledger-type.positive { background: #143323; }
+html[data-theme="dark"] .ledger-type.negative { background: #35191b; }
+html[data-theme="dark"] .plan-promise-callout { color: #7edee2; border-color: #327c82; background: #102d31; }
+html[data-theme="dark"] .plan-risk-callout { color: #ffaaa5; border-color: #75403e; background: #321a1c; }
+
+/* Modals and every nested payment/details window */
+html[data-theme="dark"] dialog {
+  color: var(--text);
+  background: #101b24;
+  box-shadow: 0 28px 88px rgba(0, 0, 0, .62);
+}
+html[data-theme="dark"] dialog::backdrop {
+  background: rgba(1, 7, 11, .76);
+  backdrop-filter: blur(3px);
+}
+html[data-theme="dark"] .modal-header { background: #0b2a3d; }
+html[data-theme="dark"] .modal-footer,
+html[data-theme="dark"] #detailsDialog .modal-footer { background: #0d1821; }
+html[data-theme="dark"] .form-callout,
+html[data-theme="dark"] #paymentPlanContext {
+  color: #b1c3cd;
+  border-color: #304957;
+  background: #12212a;
+}
+html[data-theme="dark"] .mini-card,
+html[data-theme="dark"] .responsibility-summary-card {
+  background: #13212b;
+}
+html[data-theme="dark"] .detail-item { border-bottom-color: #223540; }
+html[data-theme="dark"] #detailsDialog .detail-section { border-top-color: #223540; }
+html[data-theme="dark"] .payments-schedule-table th:last-child { background: #14232d; }
+html[data-theme="dark"] .payments-schedule-table td:last-child { background: #101b24; }
+html[data-theme="dark"] .activity-timeline::before { background: #2a3e4a; }
+html[data-theme="dark"] .activity-marker { border-color: #101b24; box-shadow: 0 0 0 1px #536b79; }
+html[data-theme="dark"] .activity-content { background: #13212b; }
+
+/* Active-board visual polish in dark mode. */
+html[data-theme="dark"] .payment-board-page .treatment-badge {
+  color: #d5e9f1;
+  border-color: #3d5967;
+  background: #162933;
+}
+html[data-theme="dark"] .payment-board-page .status-note-input { background: rgba(8, 18, 25, .88); }
+html[data-theme="dark"] .payment-board-page .financial-line.balance { background: rgba(29, 45, 55, .78); }
+html[data-theme="dark"] .payment-board-page .status-overdue-amount {
+  color: #ffaaa5;
+  border-color: rgba(255, 140, 134, .28);
+  background: rgba(78, 24, 26, .68);
+}
+html[data-theme="dark"] .payment-board-page .status-due-amount {
+  color: #f4cd79;
+  border-color: rgba(240, 197, 110, .28);
+  background: rgba(68, 49, 15, .68);
+}
+html[data-theme="dark"] .row-collapse-toggle {
+  color: #bfe1ee;
+  border-color: #3c5968;
+  background: rgba(13, 28, 37, .92);
+}
+html[data-theme="dark"] .row-collapse-toggle:hover { background: #172a35; border-color: #5a7d8e; }
+html[data-theme="dark"] .collapsed-financial-primary { color: #bbced8; }
+html[data-theme="dark"] .collapsed-financial-secondary { color: #91a6b3; }
+
+/* Miscellaneous legacy light surfaces used throughout older workflows. */
+html[data-theme="dark"] :is(
+  .document-card, .plan-summary, .installment-card, .history-card,
+  .adjustment-card, .detail-note, .completed-financial-box
+) { background: #13212b; }
+html[data-theme="dark"] :is(.document-empty, .plan-empty, .empty-callout) { background: #12202a; }
+
+/* Scrollbars: subtle enough for all long dialogs and tables. */
+html[data-theme="dark"] * {
+  scrollbar-color: #3b5665 #0c171f;
+}
+html[data-theme="dark"] *::-webkit-scrollbar { width: 11px; height: 11px; }
+html[data-theme="dark"] *::-webkit-scrollbar-track { background: #0c171f; }
+html[data-theme="dark"] *::-webkit-scrollbar-thumb {
+  border: 2px solid #0c171f;
+  border-radius: 999px;
+  background: #3b5665;
+}
+html[data-theme="dark"] *::-webkit-scrollbar-thumb:hover { background: #4d6d7e; }
+
+/* Additional dark-mode coverage for legacy workflow surfaces and callouts. */
+html[data-theme="dark"] .notes-box,
+html[data-theme="dark"] .plan-schedule-wrap,
+html[data-theme="dark"] .document-item,
+html[data-theme="dark"] .responsibility-option,
+html[data-theme="dark"] .plan-total-row.manual,
+html[data-theme="dark"] .status-note-readonly {
+  color: #c6d5de;
+  border-color: var(--border);
+  background: #121f28;
+}
+html[data-theme="dark"] .responsibility-option:has(input:checked) {
+  color: #e2f3f6;
+  border-color: #36aebb;
+  background: #123039;
+}
+html[data-theme="dark"] .plan-target-note {
+  color: #a9d7df;
+  background: #122a31;
+}
+html[data-theme="dark"] .plan-schedule-table th {
+  color: #b8cad4;
+  background: #14232d;
+}
+html[data-theme="dark"] .plan-total-row.balanced {
+  color: #92ddb0;
+  border-color: #3b6e50;
+  background: #153024;
+}
+html[data-theme="dark"] .plan-total-row.unbalanced,
+html[data-theme="dark"] .completion-balance-callout.has-balance,
+html[data-theme="dark"] .completion-summary-callout.has-balance {
+  color: #f2cf7d;
+  border-color: #745e25;
+  background: #302711;
+}
+html[data-theme="dark"] .plan-payment-context {
+  color: #cfbfff;
+  border-color: #55437c;
+  background: #241d35;
+}
+html[data-theme="dark"] .document-warning,
+html[data-theme="dark"] .uf-check-flag {
+  color: #f0cf7d;
+  border-color: #735d25;
+  background: #302711;
+}
+html[data-theme="dark"] .document-type {
+  color: #c8b4ff;
+  background: #2a2140;
+}
+html[data-theme="dark"] .health-green {
+  border-left-color: var(--paid-accent) !important;
+  background: #123021;
+}
+html[data-theme="dark"] .health-yellow {
+  border-left-color: #e7b942 !important;
+  background: #332a12;
+}
+html[data-theme="dark"] .health-red {
+  border-left-color: var(--overdue-accent) !important;
+  background: #36191b;
+}
+html[data-theme="dark"] .status-pill.health-green {
+  color: #79d99d;
+  border-color: #42815a;
+  background: #173726;
+}
+html[data-theme="dark"] .status-pill.health-yellow {
+  color: #f1cc6b;
+  border-color: #8a6c21;
+  background: #352b11;
+}
+html[data-theme="dark"] .status-pill.health-red {
+  color: #ff9a94;
+  border-color: #82413f;
+  background: #38191c;
+}
+html[data-theme="dark"] .status-pill.uf-flag {
+  color: #86c7ef;
+  border-color: #477d9e;
+  background: #122b3a;
+}
+html[data-theme="dark"] .status-pill.uf-age {
+  color: #b2c5d0;
+  border-color: #49606e;
+  background: #17242d;
+}
+html[data-theme="dark"] .toast {
+  color: #bce9cc;
+  border-color: #41765a;
+  border-left-color: var(--success);
+  background: #173126;
+}
+html[data-theme="dark"] .toast.error {
+  color: #ffb0ab;
+  border-color: #7b4140;
+  border-left-color: var(--danger);
+  background: #351b1d;
+}
+html[data-theme="dark"] .activity-content p { color: #c1d1da; }
+html[data-theme="dark"] .status-note-readonly { color: #b9cad4; }
+html[data-theme="dark"] .payment-board-page .status-note-input::placeholder { color: #78909d; }
+html[data-theme="dark"] .payments-schedule-table td:last-child {
+  border-left-color: #263a47;
 }
